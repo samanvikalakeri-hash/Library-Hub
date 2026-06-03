@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "School Library Management System"
+version = "1.0.0"
+id = "artifacts/library-app"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 21015
+
+[services.development]
+run = "pnpm --filter @workspace/library-app run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/library-app", "run", "build" ]
+publicDir = "artifacts/library-app/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "21015"
+BASE_PATH = "/"

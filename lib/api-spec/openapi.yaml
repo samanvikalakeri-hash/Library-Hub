@@ -1,22 +1,33 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: School Library Management System API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: books
+    description: Book inventory management
+  - name: students
+    description: Student management
+  - name: loans
+    description: Book loans and borrowing
+  - name: reservations
+    description: Book reservations
+  - name: fines
+    description: Fine management
+  - name: dashboard
+    description: Dashboard summaries and analytics
+
 paths:
   /healthz:
     get:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -24,6 +35,489 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── Books ────────────────────────────────────────────────────────────────
+  /books:
+    get:
+      operationId: listBooks
+      tags: [books]
+      summary: List all books
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: genre
+          in: query
+          schema: { type: string }
+        - name: available
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: List of books
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Book"
+    post:
+      operationId: createBook
+      tags: [books]
+      summary: Add a new book
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookInput"
+      responses:
+        "201":
+          description: Created book
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+
+  /books/{id}:
+    get:
+      operationId: getBook
+      tags: [books]
+      summary: Get book by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Book
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateBook
+      tags: [books]
+      summary: Update a book
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BookUpdate"
+      responses:
+        "200":
+          description: Updated book
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Book"
+    delete:
+      operationId: deleteBook
+      tags: [books]
+      summary: Delete a book
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  # ─── Students ─────────────────────────────────────────────────────────────
+  /students:
+    get:
+      operationId: listStudents
+      tags: [students]
+      summary: List all students
+      parameters:
+        - name: search
+          in: query
+          schema: { type: string }
+        - name: graduationYear
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: List of students
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Student"
+    post:
+      operationId: createStudent
+      tags: [students]
+      summary: Add a new student
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentInput"
+      responses:
+        "201":
+          description: Created student
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+
+  /students/{id}:
+    get:
+      operationId: getStudent
+      tags: [students]
+      summary: Get student by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Student
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+        "404":
+          description: Not found
+    patch:
+      operationId: updateStudent
+      tags: [students]
+      summary: Update a student
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StudentUpdate"
+      responses:
+        "200":
+          description: Updated student
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Student"
+    delete:
+      operationId: deleteStudent
+      tags: [students]
+      summary: Delete a student
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Deleted
+
+  /students/{id}/loans:
+    get:
+      operationId: getStudentLoans
+      tags: [students]
+      summary: Get all loans for a student
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Student loans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Loan"
+
+  # ─── Loans ────────────────────────────────────────────────────────────────
+  /loans:
+    get:
+      operationId: listLoans
+      tags: [loans]
+      summary: List all active loans
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, returned, overdue]
+        - name: studentId
+          in: query
+          schema: { type: integer }
+      responses:
+        "200":
+          description: List of loans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Loan"
+    post:
+      operationId: createLoan
+      tags: [loans]
+      summary: Check out a book to a student
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoanInput"
+      responses:
+        "201":
+          description: Created loan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+
+  /loans/{id}:
+    get:
+      operationId: getLoan
+      tags: [loans]
+      summary: Get loan by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Loan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+
+  /loans/{id}/return:
+    post:
+      operationId: returnLoan
+      tags: [loans]
+      summary: Return a book
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Updated loan with return info
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Loan"
+
+  # ─── Reservations ─────────────────────────────────────────────────────────
+  /reservations:
+    get:
+      operationId: listReservations
+      tags: [reservations]
+      summary: List all reservations
+      parameters:
+        - name: studentId
+          in: query
+          schema: { type: integer }
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, fulfilled, cancelled]
+      responses:
+        "200":
+          description: List of reservations
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Reservation"
+    post:
+      operationId: createReservation
+      tags: [reservations]
+      summary: Reserve a book
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReservationInput"
+      responses:
+        "201":
+          description: Created reservation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+
+  /reservations/{id}:
+    patch:
+      operationId: updateReservation
+      tags: [reservations]
+      summary: Update reservation status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReservationUpdate"
+      responses:
+        "200":
+          description: Updated reservation
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Reservation"
+    delete:
+      operationId: deleteReservation
+      tags: [reservations]
+      summary: Cancel a reservation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "204":
+          description: Cancelled
+
+  # ─── Fines ────────────────────────────────────────────────────────────────
+  /fines:
+    get:
+      operationId: listFines
+      tags: [fines]
+      summary: List all fines
+      parameters:
+        - name: studentId
+          in: query
+          schema: { type: integer }
+        - name: paid
+          in: query
+          schema: { type: boolean }
+      responses:
+        "200":
+          description: List of fines
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Fine"
+
+  /fines/{id}/clear:
+    post:
+      operationId: clearFine
+      tags: [fines]
+      summary: Mark a fine as paid/cleared
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        "200":
+          description: Updated fine
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Fine"
+
+  # ─── Dashboard ────────────────────────────────────────────────────────────
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary statistics
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+
+  /dashboard/overdue:
+    get:
+      operationId: getOverdueLoans
+      tags: [dashboard]
+      summary: Get overdue loans for alerts
+      responses:
+        "200":
+          description: Overdue loans list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Loan"
+
+  /dashboard/due-soon:
+    get:
+      operationId: getDueSoonLoans
+      tags: [dashboard]
+      summary: Get loans due within 3 days
+      responses:
+        "200":
+          description: Due soon loans
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Loan"
+
+  /dashboard/popular-books:
+    get:
+      operationId: getPopularBooks
+      tags: [dashboard]
+      summary: Get most borrowed books
+      responses:
+        "200":
+          description: Popular books
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PopularBook"
+
+  /dashboard/genre-stats:
+    get:
+      operationId: getGenreStats
+      tags: [dashboard]
+      summary: Get borrowing stats by genre
+      responses:
+        "200":
+          description: Genre stats
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/GenreStat"
+
 components:
   schemas:
     HealthStatus:
@@ -31,6 +525,174 @@ components:
       properties:
         status:
           type: string
-      required:
-        - status
+      required: [status]
 
+    Book:
+      type: object
+      required: [id, title, author, isbn, genre, totalCopies, availableCopies, createdAt]
+      properties:
+        id:          { type: integer }
+        title:       { type: string }
+        author:      { type: string }
+        isbn:        { type: string }
+        genre:       { type: string }
+        description: { type: ["string", "null"] }
+        publisher:   { type: ["string", "null"] }
+        publishedYear: { type: ["integer", "null"] }
+        coverUrl:    { type: ["string", "null"] }
+        totalCopies: { type: integer }
+        availableCopies: { type: integer }
+        createdAt:   { type: string }
+
+    BookInput:
+      type: object
+      required: [title, author, isbn, genre, totalCopies]
+      properties:
+        title:       { type: string }
+        author:      { type: string }
+        isbn:        { type: string }
+        genre:       { type: string }
+        description: { type: string }
+        publisher:   { type: string }
+        publishedYear: { type: integer }
+        coverUrl:    { type: string }
+        totalCopies: { type: integer }
+
+    BookUpdate:
+      type: object
+      properties:
+        title:       { type: string }
+        author:      { type: string }
+        isbn:        { type: string }
+        genre:       { type: string }
+        description: { type: string }
+        publisher:   { type: string }
+        publishedYear: { type: integer }
+        coverUrl:    { type: string }
+        totalCopies: { type: integer }
+
+    Student:
+      type: object
+      required: [id, name, email, studentId, graduationYear, borrowLimit, activeLoansCount, createdAt]
+      properties:
+        id:             { type: integer }
+        name:           { type: string }
+        email:          { type: string }
+        studentId:      { type: string }
+        phone:          { type: ["string", "null"] }
+        graduationYear: { type: integer }
+        borrowLimit:    { type: integer }
+        activeLoansCount: { type: integer }
+        totalFinesOwed: { type: number }
+        createdAt:      { type: string }
+
+    StudentInput:
+      type: object
+      required: [name, email, studentId, graduationYear]
+      properties:
+        name:           { type: string }
+        email:          { type: string }
+        studentId:      { type: string }
+        phone:          { type: string }
+        graduationYear: { type: integer }
+        borrowLimit:    { type: integer }
+
+    StudentUpdate:
+      type: object
+      properties:
+        name:           { type: string }
+        email:          { type: string }
+        phone:          { type: string }
+        graduationYear: { type: integer }
+        borrowLimit:    { type: integer }
+
+    Loan:
+      type: object
+      required: [id, studentId, bookId, checkedOutAt, dueDate, status]
+      properties:
+        id:           { type: integer }
+        studentId:    { type: integer }
+        bookId:       { type: integer }
+        checkedOutAt: { type: string }
+        dueDate:      { type: string }
+        returnedAt:   { type: ["string", "null"] }
+        status:       { type: string, enum: [active, returned, overdue] }
+        studentName:  { type: ["string", "null"] }
+        bookTitle:    { type: ["string", "null"] }
+        bookAuthor:   { type: ["string", "null"] }
+
+    LoanInput:
+      type: object
+      required: [studentId, bookId]
+      properties:
+        studentId: { type: integer }
+        bookId:    { type: integer }
+        dueDate:   { type: string }
+
+    Reservation:
+      type: object
+      required: [id, studentId, bookId, status, createdAt]
+      properties:
+        id:          { type: integer }
+        studentId:   { type: integer }
+        bookId:      { type: integer }
+        status:      { type: string, enum: [pending, fulfilled, cancelled] }
+        createdAt:   { type: string }
+        studentName: { type: ["string", "null"] }
+        bookTitle:   { type: ["string", "null"] }
+        bookAuthor:  { type: ["string", "null"] }
+
+    ReservationInput:
+      type: object
+      required: [studentId, bookId]
+      properties:
+        studentId: { type: integer }
+        bookId:    { type: integer }
+
+    ReservationUpdate:
+      type: object
+      properties:
+        status: { type: string, enum: [pending, fulfilled, cancelled] }
+
+    Fine:
+      type: object
+      required: [id, studentId, loanId, amount, reason, paid, createdAt]
+      properties:
+        id:          { type: integer }
+        studentId:   { type: integer }
+        loanId:      { type: integer }
+        amount:      { type: number }
+        reason:      { type: string }
+        paid:        { type: boolean }
+        paidAt:      { type: ["string", "null"] }
+        createdAt:   { type: string }
+        studentName: { type: ["string", "null"] }
+        bookTitle:   { type: ["string", "null"] }
+
+    DashboardSummary:
+      type: object
+      required: [totalBooks, totalStudents, activeLoans, overdueLoans, totalFinesOwed, booksAvailable, reservationsPending]
+      properties:
+        totalBooks:          { type: integer }
+        totalStudents:       { type: integer }
+        activeLoans:         { type: integer }
+        overdueLoans:        { type: integer }
+        totalFinesOwed:      { type: number }
+        booksAvailable:      { type: integer }
+        reservationsPending: { type: integer }
+
+    PopularBook:
+      type: object
+      required: [bookId, title, author, loanCount]
+      properties:
+        bookId:    { type: integer }
+        title:     { type: string }
+        author:    { type: string }
+        loanCount: { type: integer }
+
+    GenreStat:
+      type: object
+      required: [genre, loanCount]
+      properties:
+        genre:     { type: string }
+        loanCount: { type: integer }

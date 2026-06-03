@@ -1,0 +1,69 @@
+import { Router, type IRouter } from "express";
+import { eq, and } from "drizzle-orm";
+import { db, finesTable, studentsTable, loansTable, booksTable } from "@workspace/db";
+import {
+  ListFinesQueryParams,
+  ListFinesResponse,
+  ClearFineParams,
+  ClearFineResponse,
+} from "@workspace/api-zod";
+
+const router: IRouter = Router();
+
+router.get("/fines", async (req, res): Promise<void> => {
+  const parsed = ListFinesQueryParams.safeParse(req.query);
+  if (!parsed.success) {
+    res.status(400).json({ error: parsed.error.message });
+    return;
+  }
+  const { studentId, paid } = parsed.data;
+  const conditions = [];
+  if (studentId) conditions.push(eq(finesTable.studentId, studentId));
+  if (paid !== undefined) conditions.push(eq(finesTable.paid, paid));
+
+  const fines = await db
+    .select({
+      id: finesTable.id,
+      studentId: finesTable.studentId,
+      loanId: finesTable.loanId,
+      amount: finesTable.amount,
+      reason: finesTable.reason,
+      paid: finesTable.paid,
+      paidAt: finesTable.paidAt,
+      createdAt: finesTable.createdAt,
+      studentName: studentsTable.name,
+      bookTitle: booksTable.title,
+    })
+    .from(finesTable)
+    .leftJoin(studentsTable, eq(finesTable.studentId, studentsTable.id))
+    .leftJoin(loansTable, eq(finesTable.loanId, loansTable.id))
+    .leftJoin(booksTable, eq(loansTable.bookId, booksTable.id))
+    .where(conditions.length > 0 ? and(...conditions) : undefined)
+    .orderBy(finesTable.createdAt);
+
+  const mapped = fines.map((f) => ({ ...f, amount: parseFloat(f.amount as string) }));
+  res.json(ListFinesResponse.parse(mapped));
+});
+
+router.post("/fines/:id/clear", async (req, res): Promise<void> => {
+  const params = ClearFineParams.safeParse(req.params);
+  if (!params.success) {
+    res.status(400).json({ error: params.error.message });
+    return;
+  }
+  const [fine] = await db
+    .update(finesTable)
+    .set({ paid: true, paidAt: new Date() })
+    .where(eq(finesTable.id, params.data.id))
+    .returning();
+  if (!fine) {
+    res.status(404).json({ error: "Fine not found" });
+    return;
+  }
+  const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, fine.studentId));
+  const [loan] = await db.select().from(loansTable).where(eq(loansTable.id, fine.loanId));
+  const [book] = loan ? await db.select().from(booksTable).where(eq(booksTable.id, loan.bookId)) : [];
+  res.json(ClearFineResponse.parse({ ...fine, amount: parseFloat(fine.amount as string), studentName: student?.name, bookTitle: book?.title }));
+});
+
+export default router;
