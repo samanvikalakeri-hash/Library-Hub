@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Html5Qrcode } from "html5-qrcode";
+import { BrowserMultiFormatReader } from "@zxing/browser";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useLocation } from "wouter";
-import { BookOpen, AlertCircle, CheckCircle2 } from "lucide-react";
+import { BookOpen, AlertCircle, CheckCircle2, Loader2 } from "lucide-react";
 
 interface QrScannerProps {
   open: boolean;
@@ -14,12 +14,20 @@ type ScanState = "scanning" | "found" | "notfound" | "error";
 
 export function QrScanner({ open, onOpenChange }: QrScannerProps) {
   const [, navigate] = useLocation();
-  const scannerRef = useRef<Html5Qrcode | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const controlsRef = useRef<{ stop: () => void } | null>(null);
   const [scanState, setScanState] = useState<ScanState>("scanning");
   const [scannedIsbn, setScannedIsbn] = useState<string>("");
   const [foundBookId, setFoundBookId] = useState<number | null>(null);
   const [foundBookTitle, setFoundBookTitle] = useState<string>("");
   const [errorMsg, setErrorMsg] = useState<string>("");
+
+  const stopScanner = () => {
+    if (controlsRef.current) {
+      try { controlsRef.current.stop(); } catch {}
+      controlsRef.current = null;
+    }
+  };
 
   useEffect(() => {
     if (!open) {
@@ -27,53 +35,82 @@ export function QrScanner({ open, onOpenChange }: QrScannerProps) {
       setScanState("scanning");
       setScannedIsbn("");
       setFoundBookId(null);
+      setFoundBookTitle("");
+      setErrorMsg("");
       return;
     }
 
-    const startScanner = async () => {
-      try {
-        const scanner = new Html5Qrcode("qr-reader");
-        scannerRef.current = scanner;
+    let cancelled = false;
 
-        await scanner.start(
-          { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 150 } },
-          async (decodedText) => {
-            const isbn = decodedText.replace(/[^0-9X]/gi, "");
+    const startScanner = async () => {
+      if (!videoRef.current) return;
+
+      try {
+        const reader = new BrowserMultiFormatReader();
+        const controls = await reader.decodeFromVideoDevice(
+          undefined,
+          videoRef.current,
+          async (result, err) => {
+            if (cancelled) return;
+            if (!result) return;
+
+            const raw = result.getText();
+            const isbn = raw.replace(/[^0-9X]/gi, "");
             if (isbn.length < 10) return;
 
-            await scanner.stop();
+            controls.stop();
+            controlsRef.current = null;
             setScannedIsbn(isbn);
 
-            const result = await fetch(`/api/books?search=${encodeURIComponent(isbn)}`).then((r) => r.json());
-            const match = Array.isArray(result) ? result.find((b: any) => b.isbn.replace(/[^0-9X]/gi, "") === isbn) : null;
+            try {
+              const res = await fetch(`/api/books?search=${encodeURIComponent(isbn)}`);
+              const books = await res.json();
+              const match = Array.isArray(books)
+                ? books.find((b: any) => b.isbn?.replace(/[^0-9X]/gi, "") === isbn)
+                : null;
 
-            if (match) {
-              setFoundBookId(match.id);
-              setFoundBookTitle(match.title);
-              setScanState("found");
-            } else {
-              setScanState("notfound");
+              if (!cancelled) {
+                if (match) {
+                  setFoundBookId(match.id);
+                  setFoundBookTitle(match.title);
+                  setScanState("found");
+                } else {
+                  setScanState("notfound");
+                }
+              }
+            } catch {
+              if (!cancelled) {
+                setErrorMsg("Failed to look up book. Check your connection.");
+                setScanState("error");
+              }
             }
-          },
-          () => {}
+          }
         );
+
+        if (!cancelled) {
+          controlsRef.current = controls;
+        } else {
+          controls.stop();
+        }
       } catch (err: any) {
-        setErrorMsg(err?.message ?? "Camera access denied or not available");
-        setScanState("error");
+        if (!cancelled) {
+          const msg =
+            err?.message?.includes("Permission") || err?.name === "NotAllowedError"
+              ? "Camera access denied. Please allow camera permissions and try again."
+              : err?.message ?? "Camera not available on this device.";
+          setErrorMsg(msg);
+          setScanState("error");
+        }
       }
     };
 
-    const timer = setTimeout(startScanner, 300);
-    return () => clearTimeout(timer);
+    const timer = setTimeout(startScanner, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      stopScanner();
+    };
   }, [open]);
-
-  const stopScanner = () => {
-    if (scannerRef.current) {
-      scannerRef.current.stop().catch(() => {});
-      scannerRef.current = null;
-    }
-  };
 
   const handleViewBook = () => {
     onOpenChange(false);
@@ -81,11 +118,13 @@ export function QrScanner({ open, onOpenChange }: QrScannerProps) {
   };
 
   const handleScanAgain = () => {
+    stopScanner();
     setScanState("scanning");
     setScannedIsbn("");
     setFoundBookId(null);
+    setFoundBookTitle("");
     onOpenChange(false);
-    setTimeout(() => onOpenChange(true), 100);
+    setTimeout(() => onOpenChange(true), 150);
   };
 
   return (
@@ -102,9 +141,23 @@ export function QrScanner({ open, onOpenChange }: QrScannerProps) {
           {scanState === "scanning" && (
             <>
               <p className="text-sm text-muted-foreground text-center">
-                Point camera at the book's ISBN barcode
+                Point your camera at the book's ISBN barcode
               </p>
-              <div id="qr-reader" className="rounded-lg overflow-hidden" />
+              <div className="relative rounded-lg overflow-hidden bg-black aspect-video flex items-center justify-center">
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  muted
+                  playsInline
+                />
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  <div className="w-48 h-20 border-2 border-teal-400 rounded opacity-70" />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground text-center flex items-center justify-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" />
+                Scanning for barcodes…
+              </p>
             </>
           )}
 
@@ -132,6 +185,9 @@ export function QrScanner({ open, onOpenChange }: QrScannerProps) {
               <div>
                 <p className="font-semibold">Book not found</p>
                 <p className="text-sm text-muted-foreground">ISBN: {scannedIsbn}</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  This ISBN isn't in your library yet. Add it via "Add Book".
+                </p>
               </div>
               <Button variant="outline" onClick={handleScanAgain}>Scan again</Button>
             </div>
