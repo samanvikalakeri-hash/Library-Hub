@@ -202,6 +202,9 @@ function BookForm({ book, onSuccess }: { book?: any; onSuccess: () => void }) {
           toast({ title: "Book updated" });
           queryClient.invalidateQueries({ queryKey: getListBooksQueryKey() });
           onSuccess();
+        },
+        onError: (err: any) => {
+          toast({ title: "Failed to update book", description: err?.response?.data?.error ?? "An error occurred", variant: "destructive" });
         }
       });
     } else {
@@ -210,6 +213,9 @@ function BookForm({ book, onSuccess }: { book?: any; onSuccess: () => void }) {
           toast({ title: "Book created" });
           queryClient.invalidateQueries({ queryKey: getListBooksQueryKey() });
           onSuccess();
+        },
+        onError: (err: any) => {
+          toast({ title: "Failed to create book", description: err?.response?.data?.error ?? "An error occurred", variant: "destructive" });
         }
       });
     }

@@ -198,6 +198,9 @@ function StudentForm({ student, onSuccess }: { student?: any; onSuccess: () => v
           toast({ title: "Student updated" });
           queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
           onSuccess();
+        },
+        onError: (err: any) => {
+          toast({ title: "Failed to update student", description: err?.response?.data?.error ?? "An error occurred", variant: "destructive" });
         }
       });
     } else {
@@ -206,6 +209,9 @@ function StudentForm({ student, onSuccess }: { student?: any; onSuccess: () => v
           toast({ title: "Student added" });
           queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
           onSuccess();
+        },
+        onError: (err: any) => {
+          toast({ title: "Failed to add student", description: err?.response?.data?.error ?? "An error occurred", variant: "destructive" });
         }
       });
     }

@@ -10,6 +10,7 @@ import {
   ReturnLoanParams,
   ReturnLoanResponse,
 } from "@workspace/api-zod";
+import { serializeDates } from "../lib/serialize";
 
 const router: IRouter = Router();
 
@@ -59,7 +60,7 @@ router.get("/loans", async (req, res): Promise<void> => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(sql`${loansTable.checkedOutAt} desc`);
 
-  res.json(ListLoansResponse.parse(loans));
+  res.json(ListLoansResponse.parse(serializeDates(loans)));
 });
 
 router.post("/loans", async (req, res): Promise<void> => {
@@ -70,7 +71,6 @@ router.post("/loans", async (req, res): Promise<void> => {
   }
   const { studentId, bookId, dueDate } = parsed.data;
 
-  // Check book availability
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, bookId));
   if (!book) {
     res.status(404).json({ error: "Book not found" });
@@ -81,7 +81,6 @@ router.post("/loans", async (req, res): Promise<void> => {
     return;
   }
 
-  // Check student borrow limit
   const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, studentId));
   if (!student) {
     res.status(404).json({ error: "Student not found" });
@@ -92,7 +91,7 @@ router.post("/loans", async (req, res): Promise<void> => {
     .from(loansTable)
     .where(and(eq(loansTable.studentId, studentId), sql`${loansTable.status} != 'returned'`));
   if ((activeCount?.count ?? 0) >= student.borrowLimit) {
-    res.status(400).json({ error: "Student has reached their borrow limit" });
+    res.status(400).json({ error: `Student has reached their borrow limit of ${student.borrowLimit}` });
     return;
   }
 
@@ -103,13 +102,17 @@ router.post("/loans", async (req, res): Promise<void> => {
     .values({ studentId, bookId, dueDate: due, status: "active" })
     .returning();
 
-  // Decrement available copies
   await db
     .update(booksTable)
     .set({ availableCopies: book.availableCopies - 1 })
     .where(eq(booksTable.id, bookId));
 
-  res.status(201).json(GetLoanResponse.parse({ ...loan, studentName: student.name, bookTitle: book.title, bookAuthor: book.author }));
+  res.status(201).json(GetLoanResponse.parse(serializeDates({
+    ...loan,
+    studentName: student.name,
+    bookTitle: book.title,
+    bookAuthor: book.author,
+  })));
 });
 
 router.get("/loans/:id", async (req, res): Promise<void> => {
@@ -140,7 +143,7 @@ router.get("/loans/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Loan not found" });
     return;
   }
-  res.json(GetLoanResponse.parse(loan));
+  res.json(GetLoanResponse.parse(serializeDates(loan)));
 });
 
 router.post("/loans/:id/return", async (req, res): Promise<void> => {
@@ -167,13 +170,11 @@ router.post("/loans/:id/return", async (req, res): Promise<void> => {
     .where(eq(loansTable.id, params.data.id))
     .returning();
 
-  // Increment available copies
   await db
     .update(booksTable)
     .set({ availableCopies: sql`${booksTable.availableCopies} + 1` })
     .where(eq(booksTable.id, existing.bookId));
 
-  // Calculate fine if overdue
   if (now > existing.dueDate) {
     const daysLate = Math.ceil((now.getTime() - existing.dueDate.getTime()) / 86400000);
     const amount = (daysLate * FINE_PER_DAY).toFixed(2);
@@ -189,7 +190,12 @@ router.post("/loans/:id/return", async (req, res): Promise<void> => {
   const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, loan.studentId));
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, loan.bookId));
 
-  res.json(ReturnLoanResponse.parse({ ...loan, studentName: student?.name, bookTitle: book?.title, bookAuthor: book?.author }));
+  res.json(ReturnLoanResponse.parse(serializeDates({
+    ...loan,
+    studentName: student?.name,
+    bookTitle: book?.title,
+    bookAuthor: book?.author,
+  })));
 });
 
 export default router;

@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, and, sql } from "drizzle-orm";
-import { db, studentsTable, loansTable, finesTable } from "@workspace/db";
+import { db, studentsTable, loansTable, finesTable, booksTable } from "@workspace/db";
 import {
   ListStudentsQueryParams,
   ListStudentsResponse,
@@ -14,7 +14,7 @@ import {
   GetStudentLoansParams,
   GetStudentLoansResponse,
 } from "@workspace/api-zod";
-import { booksTable } from "@workspace/db";
+import { serializeDates } from "../lib/serialize";
 
 const router: IRouter = Router();
 
@@ -52,7 +52,7 @@ router.get("/students", async (req, res): Promise<void> => {
     .orderBy(studentsTable.name);
 
   const enriched = await Promise.all(students.map(enrichStudent));
-  res.json(ListStudentsResponse.parse(enriched));
+  res.json(ListStudentsResponse.parse(serializeDates(enriched)));
 });
 
 router.post("/students", async (req, res): Promise<void> => {
@@ -61,9 +61,13 @@ router.post("/students", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [student] = await db.insert(studentsTable).values(parsed.data).returning();
+  const { phone, ...rest } = parsed.data;
+  const [student] = await db
+    .insert(studentsTable)
+    .values({ ...rest, phone: phone || null })
+    .returning();
   const enriched = await enrichStudent(student);
-  res.status(201).json(GetStudentResponse.parse(enriched));
+  res.status(201).json(GetStudentResponse.parse(serializeDates(enriched)));
 });
 
 router.get("/students/:id", async (req, res): Promise<void> => {
@@ -78,7 +82,7 @@ router.get("/students/:id", async (req, res): Promise<void> => {
     return;
   }
   const enriched = await enrichStudent(student);
-  res.json(GetStudentResponse.parse(enriched));
+  res.json(GetStudentResponse.parse(serializeDates(enriched)));
 });
 
 router.patch("/students/:id", async (req, res): Promise<void> => {
@@ -92,9 +96,10 @@ router.patch("/students/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+  const { phone, ...rest } = parsed.data;
   const [student] = await db
     .update(studentsTable)
-    .set(parsed.data)
+    .set({ ...rest, ...(phone !== undefined ? { phone: phone || null } : {}) })
     .where(eq(studentsTable.id, params.data.id))
     .returning();
   if (!student) {
@@ -102,7 +107,7 @@ router.patch("/students/:id", async (req, res): Promise<void> => {
     return;
   }
   const enriched = await enrichStudent(student);
-  res.json(UpdateStudentResponse.parse(enriched));
+  res.json(UpdateStudentResponse.parse(serializeDates(enriched)));
 });
 
 router.delete("/students/:id", async (req, res): Promise<void> => {
@@ -144,7 +149,7 @@ router.get("/students/:id/loans", async (req, res): Promise<void> => {
     .where(eq(loansTable.studentId, params.data.id))
     .orderBy(sql`${loansTable.checkedOutAt} desc`);
 
-  res.json(GetStudentLoansResponse.parse(loans));
+  res.json(GetStudentLoansResponse.parse(serializeDates(loans)));
 });
 
 export default router;

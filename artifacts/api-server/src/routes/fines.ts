@@ -7,6 +7,7 @@ import {
   ClearFineParams,
   ClearFineResponse,
 } from "@workspace/api-zod";
+import { serializeDates } from "../lib/serialize";
 
 const router: IRouter = Router();
 
@@ -42,7 +43,7 @@ router.get("/fines", async (req, res): Promise<void> => {
     .orderBy(finesTable.createdAt);
 
   const mapped = fines.map((f) => ({ ...f, amount: parseFloat(f.amount as string) }));
-  res.json(ListFinesResponse.parse(mapped));
+  res.json(ListFinesResponse.parse(serializeDates(mapped)));
 });
 
 router.post("/fines/:id/clear", async (req, res): Promise<void> => {
@@ -62,8 +63,14 @@ router.post("/fines/:id/clear", async (req, res): Promise<void> => {
   }
   const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, fine.studentId));
   const [loan] = await db.select().from(loansTable).where(eq(loansTable.id, fine.loanId));
-  const [book] = loan ? await db.select().from(booksTable).where(eq(booksTable.id, loan.bookId)) : [];
-  res.json(ClearFineResponse.parse({ ...fine, amount: parseFloat(fine.amount as string), studentName: student?.name, bookTitle: book?.title }));
+  const bookRows = loan ? await db.select().from(booksTable).where(eq(booksTable.id, loan.bookId)) : [];
+  const book = bookRows[0];
+  res.json(ClearFineResponse.parse(serializeDates({
+    ...fine,
+    amount: parseFloat(fine.amount as string),
+    studentName: student?.name,
+    bookTitle: book?.title,
+  })));
 });
 
 export default router;

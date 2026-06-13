@@ -12,6 +12,7 @@ import {
   UpdateBookResponse,
   DeleteBookParams,
 } from "@workspace/api-zod";
+import { serializeDates } from "../lib/serialize";
 
 const router: IRouter = Router();
 
@@ -39,7 +40,7 @@ router.get("/books", async (req, res): Promise<void> => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(booksTable.title);
 
-  res.json(ListBooksResponse.parse(books));
+  res.json(ListBooksResponse.parse(serializeDates(books)));
 });
 
 router.post("/books", async (req, res): Promise<void> => {
@@ -48,12 +49,18 @@ router.post("/books", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { totalCopies = 1, ...rest } = parsed.data;
+  const { totalCopies = 1, description, publisher, ...rest } = parsed.data;
   const [book] = await db
     .insert(booksTable)
-    .values({ ...rest, totalCopies, availableCopies: totalCopies })
+    .values({
+      ...rest,
+      totalCopies,
+      availableCopies: totalCopies,
+      description: description || null,
+      publisher: publisher || null,
+    })
     .returning();
-  res.status(201).json(GetBookResponse.parse(book));
+  res.status(201).json(GetBookResponse.parse(serializeDates(book)));
 });
 
 router.get("/books/:id", async (req, res): Promise<void> => {
@@ -67,7 +74,7 @@ router.get("/books/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Book not found" });
     return;
   }
-  res.json(GetBookResponse.parse(book));
+  res.json(GetBookResponse.parse(serializeDates(book)));
 });
 
 router.patch("/books/:id", async (req, res): Promise<void> => {
@@ -86,7 +93,6 @@ router.patch("/books/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Book not found" });
     return;
   }
-  // If totalCopies changes, adjust availableCopies proportionally
   const updates: Partial<typeof booksTable.$inferInsert> = { ...parsed.data };
   if (parsed.data.totalCopies !== undefined) {
     const diff = parsed.data.totalCopies - existing[0].totalCopies;
@@ -97,7 +103,7 @@ router.patch("/books/:id", async (req, res): Promise<void> => {
     .set(updates)
     .where(eq(booksTable.id, params.data.id))
     .returning();
-  res.json(UpdateBookResponse.parse(book));
+  res.json(UpdateBookResponse.parse(serializeDates(book)));
 });
 
 router.delete("/books/:id", async (req, res): Promise<void> => {

@@ -10,6 +10,7 @@ import {
   UpdateReservationResponse,
   DeleteReservationParams,
 } from "@workspace/api-zod";
+import { serializeDates } from "../lib/serialize";
 
 const router: IRouter = Router();
 
@@ -41,7 +42,7 @@ router.get("/reservations", async (req, res): Promise<void> => {
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(reservationsTable.createdAt);
 
-  res.json(ListReservationsResponse.parse(reservations));
+  res.json(ListReservationsResponse.parse(serializeDates(reservations)));
 });
 
 router.post("/reservations", async (req, res): Promise<void> => {
@@ -53,12 +54,12 @@ router.post("/reservations", async (req, res): Promise<void> => {
   const [reservation] = await db.insert(reservationsTable).values(parsed.data).returning();
   const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, reservation.studentId));
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, reservation.bookId));
-  res.status(201).json({
+  res.status(201).json(serializeDates({
     ...reservation,
     studentName: student?.name,
     bookTitle: book?.title,
     bookAuthor: book?.author,
-  });
+  }));
 });
 
 router.patch("/reservations/:id", async (req, res): Promise<void> => {
@@ -83,7 +84,12 @@ router.patch("/reservations/:id", async (req, res): Promise<void> => {
   }
   const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, reservation.studentId));
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, reservation.bookId));
-  res.json(UpdateReservationResponse.parse({ ...reservation, studentName: student?.name, bookTitle: book?.title, bookAuthor: book?.author }));
+  res.json(UpdateReservationResponse.parse(serializeDates({
+    ...reservation,
+    studentName: student?.name,
+    bookTitle: book?.title,
+    bookAuthor: book?.author,
+  })));
 });
 
 router.delete("/reservations/:id", async (req, res): Promise<void> => {

@@ -8,10 +8,10 @@ import {
   GetPopularBooksResponse,
   GetGenreStatsResponse,
 } from "@workspace/api-zod";
+import { serializeDates } from "../lib/serialize";
 
 const router: IRouter = Router();
 
-// Auto-update overdue statuses
 async function markOverdue() {
   await db
     .update(loansTable)
@@ -70,7 +70,7 @@ router.get("/dashboard/overdue", async (_req, res): Promise<void> => {
     .leftJoin(booksTable, eq(loansTable.bookId, booksTable.id))
     .where(eq(loansTable.status, "overdue"))
     .orderBy(loansTable.dueDate);
-  res.json(GetOverdueLoansResponse.parse(loans));
+  res.json(GetOverdueLoansResponse.parse(serializeDates(loans)));
 });
 
 router.get("/dashboard/due-soon", async (_req, res): Promise<void> => {
@@ -99,7 +99,7 @@ router.get("/dashboard/due-soon", async (_req, res): Promise<void> => {
       )
     )
     .orderBy(loansTable.dueDate);
-  res.json(GetDueSoonLoansResponse.parse(loans));
+  res.json(GetDueSoonLoansResponse.parse(serializeDates(loans)));
 });
 
 router.get("/dashboard/popular-books", async (_req, res): Promise<void> => {
@@ -115,7 +115,7 @@ router.get("/dashboard/popular-books", async (_req, res): Promise<void> => {
     .groupBy(booksTable.id, booksTable.title, booksTable.author)
     .orderBy(sql`count(${loansTable.id}) desc`)
     .limit(10);
-  res.json(GetPopularBooksResponse.parse(popular));
+  res.json(GetPopularBooksResponse.parse(serializeDates(popular)));
 });
 
 router.get("/dashboard/genre-stats", async (_req, res): Promise<void> => {
@@ -128,7 +128,7 @@ router.get("/dashboard/genre-stats", async (_req, res): Promise<void> => {
     .leftJoin(booksTable, eq(loansTable.bookId, booksTable.id))
     .groupBy(booksTable.genre)
     .orderBy(sql`count(${loansTable.id}) desc`);
-  res.json(GetGenreStatsResponse.parse(stats));
+  res.json(GetGenreStatsResponse.parse(serializeDates(stats)));
 });
 
 export default router;
