@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useListBooks, useCreateReservation, getListReservationsQueryKey } from "@workspace/api-client-react";
+import { useDebounce } from "@/hooks/use-debounce";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,7 +15,8 @@ const CURRENT_STUDENT_ID = 1;
 
 export default function Catalog() {
   const [search, setSearch] = useState("");
-  const { data: books, isLoading } = useListBooks({ search });
+  const debouncedSearch = useDebounce(search, 300);
+  const { data: books, isLoading } = useListBooks({ search: debouncedSearch });
 
   return (
     <div className="min-h-screen bg-muted/10">

@@ -9,6 +9,37 @@ export interface HealthStatus {
   status: string;
 }
 
+export type LoginInputRole = typeof LoginInputRole[keyof typeof LoginInputRole];
+
+
+export const LoginInputRole = {
+  librarian: 'librarian',
+  student: 'student',
+} as const;
+
+export interface LoginInput {
+  role: LoginInputRole;
+  username?: string;
+  password?: string;
+  studentId?: string;
+}
+
+export type AuthUserRole = typeof AuthUserRole[keyof typeof AuthUserRole];
+
+
+export const AuthUserRole = {
+  librarian: 'librarian',
+  student: 'student',
+} as const;
+
+export interface AuthUser {
+  id: string;
+  role: AuthUserRole;
+  name: string;
+  /** @nullable */
+  studentRecordId?: number | null;
+}
+
 export interface Book {
   id: number;
   title: string;

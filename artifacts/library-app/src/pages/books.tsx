@@ -1,5 +1,6 @@
 import { useListBooks, useCreateBook, useUpdateBook, useDeleteBook, getListBooksQueryKey } from "@workspace/api-client-react";
 import { useState } from "react";
+import { useDebounce } from "@/hooks/use-debounce";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -29,7 +30,8 @@ const bookSchema = z.object({
 
 export default function Books() {
   const [search, setSearch] = useState("");
-  const { data: books, isLoading } = useListBooks({ search });
+  const debouncedSearch = useDebounce(search, 300);
+  const { data: books, isLoading } = useListBooks({ search: debouncedSearch });
   const [isAddOpen, setIsAddOpen] = useState(false);
 
   return (

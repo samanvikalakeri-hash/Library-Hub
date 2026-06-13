@@ -8,19 +8,13 @@ servers:
     description: Base API path
 tags:
   - name: health
-    description: Health operations
+  - name: auth
   - name: books
-    description: Book inventory management
   - name: students
-    description: Student management
   - name: loans
-    description: Book loans and borrowing
   - name: reservations
-    description: Book reservations
   - name: fines
-    description: Fine management
   - name: dashboard
-    description: Dashboard summaries and analytics
 
 paths:
   /healthz:
@@ -35,6 +29,52 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  # ─── Auth ─────────────────────────────────────────────────────────────────
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      operationId: logout
+      tags: [auth]
+      summary: Logout
+      responses:
+        "200":
+          description: Logged out
+
+  /auth/me:
+    get:
+      operationId: getMe
+      tags: [auth]
+      summary: Get current user
+      responses:
+        "200":
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthUser"
+        "401":
+          description: Not authenticated
 
   # ─── Books ────────────────────────────────────────────────────────────────
   /books:
@@ -252,7 +292,7 @@ paths:
     get:
       operationId: listLoans
       tags: [loans]
-      summary: List all active loans
+      summary: List all loans
       parameters:
         - name: status
           in: query
@@ -319,7 +359,7 @@ paths:
           schema: { type: integer }
       responses:
         "200":
-          description: Updated loan with return info
+          description: Updated loan
           content:
             application/json:
               schema:
@@ -462,10 +502,10 @@ paths:
     get:
       operationId: getOverdueLoans
       tags: [dashboard]
-      summary: Get overdue loans for alerts
+      summary: Get overdue loans
       responses:
         "200":
-          description: Overdue loans list
+          description: Overdue loans
           content:
             application/json:
               schema:
@@ -526,6 +566,34 @@ components:
         status:
           type: string
       required: [status]
+
+    LoginInput:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [librarian, student]
+        username:
+          type: string
+        password:
+          type: string
+        studentId:
+          type: string
+
+    AuthUser:
+      type: object
+      required: [id, role, name]
+      properties:
+        id:
+          type: string
+        role:
+          type: string
+          enum: [librarian, student]
+        name:
+          type: string
+        studentRecordId:
+          type: ["integer", "null"]
 
     Book:
       type: object

@@ -1,0 +1,3 @@
+- [Date serialization rule](date-serialization.md) — Drizzle returns Date objects; Zod expects strings. Always run serializeDates() before Zod parse in every route handler.
+- [Auth design](auth-design.md) — Session auth via express-session. Librarian: username/password. Student: studentId as sole credential (no password table).
+- [Search debounce pattern](search-debounce.md) — All search bars use useDebounce(300ms) hook to avoid API flooding on each keystroke.

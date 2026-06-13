@@ -17,6 +17,35 @@ export const HealthCheckResponse = zod.object({
 
 
 /**
+ * @summary Login
+ */
+export const LoginBody = zod.object({
+  "role": zod.enum(['librarian', 'student']),
+  "username": zod.string().optional(),
+  "password": zod.string().optional(),
+  "studentId": zod.string().optional()
+})
+
+export const LoginResponse = zod.object({
+  "id": zod.string(),
+  "role": zod.enum(['librarian', 'student']),
+  "name": zod.string(),
+  "studentRecordId": zod.number().nullish()
+})
+
+
+/**
+ * @summary Get current user
+ */
+export const GetMeResponse = zod.object({
+  "id": zod.string(),
+  "role": zod.enum(['librarian', 'student']),
+  "name": zod.string(),
+  "studentRecordId": zod.number().nullish()
+})
+
+
+/**
  * @summary List all books
  */
 export const ListBooksQueryParams = zod.object({
@@ -241,7 +270,7 @@ export const GetStudentLoansResponse = zod.array(GetStudentLoansResponseItem)
 
 
 /**
- * @summary List all active loans
+ * @summary List all loans
  */
 export const ListLoansQueryParams = zod.object({
   "status": zod.enum(['active', 'returned', 'overdue']).optional(),
@@ -435,7 +464,7 @@ export const GetDashboardSummaryResponse = zod.object({
 
 
 /**
- * @summary Get overdue loans for alerts
+ * @summary Get overdue loans
  */
 export const GetOverdueLoansResponseItem = zod.object({
   "id": zod.number(),

@@ -6,6 +6,8 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from './authUser';
+export * from './authUserRole';
 export * from './book';
 export * from './bookInput';
 export * from './bookUpdate';
@@ -23,6 +25,8 @@ export * from './listStudentsParams';
 export * from './loan';
 export * from './loanInput';
 export * from './loanStatus';
+export * from './loginInput';
+export * from './loginInputRole';
 export * from './popularBook';
 export * from './reservation';
 export * from './reservationInput';

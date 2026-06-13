@@ -1,5 +1,6 @@
 import { useListStudents, useCreateStudent, useUpdateStudent, useDeleteStudent, getListStudentsQueryKey } from "@workspace/api-client-react";
 import { useState } from "react";
+import { useDebounce } from "@/hooks/use-debounce";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
@@ -26,7 +27,8 @@ const studentSchema = z.object({
 
 export default function Students() {
   const [search, setSearch] = useState("");
-  const { data: students, isLoading } = useListStudents({ search });
+  const debouncedSearch = useDebounce(search, 300);
+  const { data: students, isLoading } = useListStudents({ search: debouncedSearch });
   const [isAddOpen, setIsAddOpen] = useState(false);
 
   return (

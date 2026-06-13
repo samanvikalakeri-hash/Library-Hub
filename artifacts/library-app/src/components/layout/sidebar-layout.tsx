@@ -1,4 +1,7 @@
 import { Link, useLocation } from "wouter";
+import { useState } from "react";
+import { useAuth } from "@/lib/auth-context";
+import { QrScanner } from "@/components/qr-scanner";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -9,22 +12,33 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-  SidebarProvider
+  SidebarProvider,
+  SidebarFooter
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, BookCopy, Users, ClipboardList, Clock, Receipt, Library } from "lucide-react";
+import { LayoutDashboard, BookCopy, Users, ClipboardList, Clock, Receipt, Library, QrCode, LogOut, User } from "lucide-react";
+import { Button } from "@/components/ui/button";
+
+const librarianNavItems = [
+  { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/books", label: "Book Inventory", icon: BookCopy },
+  { href: "/students", label: "Student Roster", icon: Users },
+  { href: "/loans", label: "Transaction Details", icon: ClipboardList },
+  { href: "/reservations", label: "Reservations", icon: Clock },
+  { href: "/fines", label: "Fines", icon: Receipt },
+  { href: "/catalog", label: "Student Catalog", icon: Library },
+];
+
+const studentNavItems = [
+  { href: "/catalog", label: "Book Catalog", icon: Library },
+  { href: "/my-account", label: "My Account", icon: User },
+];
 
 export function SidebarLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
+  const { user, logout } = useAuth();
+  const [scannerOpen, setScannerOpen] = useState(false);
 
-  const navItems = [
-    { href: "/", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/books", label: "Book Inventory", icon: BookCopy },
-    { href: "/students", label: "Student Roster", icon: Users },
-    { href: "/loans", label: "Loans", icon: ClipboardList },
-    { href: "/reservations", label: "Reservations", icon: Clock },
-    { href: "/fines", label: "Fines", icon: Receipt },
-    { href: "/catalog", label: "Student Catalog", icon: Library },
-  ];
+  const navItems = user?.role === "librarian" ? librarianNavItems : studentNavItems;
 
   return (
     <SidebarProvider>
@@ -36,9 +50,12 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
               <span>Alexandria</span>
             </div>
           </SidebarHeader>
+
           <SidebarContent>
             <SidebarGroup>
-              <SidebarGroupLabel>Library Management</SidebarGroupLabel>
+              <SidebarGroupLabel>
+                {user?.role === "librarian" ? "Library Management" : "Student Portal"}
+              </SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {navItems.map((item) => {
@@ -55,15 +72,46 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
                       </SidebarMenuItem>
                     );
                   })}
+
+                  {user?.role === "librarian" && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton
+                        onClick={() => setScannerOpen(true)}
+                        tooltip="QR / Barcode Scanner"
+                      >
+                        <QrCode className="h-4 w-4" />
+                        <span>QR Scanner</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
           </SidebarContent>
+
+          <SidebarFooter className="border-t border-border/50 p-3 space-y-1">
+            <div className="px-2 py-1">
+              <p className="text-xs font-medium text-foreground truncate">{user?.name}</p>
+              <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-muted-foreground hover:text-red-600 hover:bg-red-50"
+              onClick={logout}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign out
+            </Button>
+          </SidebarFooter>
         </Sidebar>
+
         <main className="flex-1 overflow-auto">
           {children}
         </main>
       </div>
+
+      <QrScanner open={scannerOpen} onOpenChange={setScannerOpen} />
     </SidebarProvider>
   );
 }
