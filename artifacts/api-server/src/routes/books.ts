@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
-import { eq, ilike, and, sql } from "drizzle-orm";
-import { db, booksTable } from "@workspace/db";
+import { eq, ilike, and, sql, inArray } from "drizzle-orm";
+import { db, booksTable, loansTable, reservationsTable, finesTable } from "@workspace/db";
 import {
   ListBooksQueryParams,
   ListBooksResponse,
@@ -112,11 +112,50 @@ router.delete("/books/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [book] = await db.delete(booksTable).where(eq(booksTable.id, params.data.id)).returning();
-  if (!book) {
+
+  const bookId = params.data.id;
+
+  const [existing] = await db.select().from(booksTable).where(eq(booksTable.id, bookId));
+  if (!existing) {
     res.status(404).json({ error: "Book not found" });
     return;
   }
+
+  const activeLoans = await db
+    .select({ id: loansTable.id })
+    .from(loansTable)
+    .where(and(eq(loansTable.bookId, bookId), inArray(loansTable.status, ["active", "overdue"])));
+  if (activeLoans.length > 0) {
+    res.status(409).json({
+      error: `Cannot delete: this book has ${activeLoans.length} active loan(s). Return the book(s) first.`,
+    });
+    return;
+  }
+
+  const pendingReservations = await db
+    .select({ id: reservationsTable.id })
+    .from(reservationsTable)
+    .where(and(eq(reservationsTable.bookId, bookId), eq(reservationsTable.status, "pending")));
+  if (pendingReservations.length > 0) {
+    res.status(409).json({
+      error: `Cannot delete: this book has ${pendingReservations.length} pending reservation(s). Cancel them first.`,
+    });
+    return;
+  }
+
+  const bookLoans = await db
+    .select({ id: loansTable.id })
+    .from(loansTable)
+    .where(eq(loansTable.bookId, bookId));
+  if (bookLoans.length > 0) {
+    const loanIds = bookLoans.map((l) => l.id);
+    await db.delete(finesTable).where(inArray(finesTable.loanId, loanIds));
+    await db.delete(loansTable).where(eq(loansTable.bookId, bookId));
+  }
+
+  await db.delete(reservationsTable).where(eq(reservationsTable.bookId, bookId));
+  await db.delete(booksTable).where(eq(booksTable.id, bookId));
+
   res.sendStatus(204);
 });
 

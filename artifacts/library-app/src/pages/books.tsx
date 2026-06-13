@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -130,19 +131,24 @@ export default function Books() {
 
 function BookActions({ book }: { book: any }) {
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const deleteBook = useDeleteBook();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const handleDelete = () => {
-    if (confirm(`Are you sure you want to delete "${book.title}"?`)) {
-      deleteBook.mutate({ id: book.id }, {
-        onSuccess: () => {
-          toast({ title: "Book deleted" });
-          queryClient.invalidateQueries({ queryKey: getListBooksQueryKey() });
-        }
-      });
-    }
+    deleteBook.mutate({ id: book.id }, {
+      onSuccess: () => {
+        toast({ title: "Book deleted" });
+        queryClient.invalidateQueries({ queryKey: getListBooksQueryKey() });
+        setIsDeleteOpen(false);
+      },
+      onError: (err: any) => {
+        const msg = err?.data?.error ?? err?.message ?? "This book has active loans or reservations.";
+        toast({ title: "Cannot delete book", description: msg, variant: "destructive" });
+        setIsDeleteOpen(false);
+      },
+    });
   };
 
   return (
@@ -152,8 +158,12 @@ function BookActions({ book }: { book: any }) {
           <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setIsEditOpen(true)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleDelete} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setIsEditOpen(true)}>
+            <Edit className="mr-2 h-4 w-4" /> Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setIsDeleteOpen(true)} className="text-destructive">
+            <Trash2 className="mr-2 h-4 w-4" /> Delete
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -165,6 +175,27 @@ function BookActions({ book }: { book: any }) {
           <BookForm book={book} onSuccess={() => setIsEditOpen(false)} />
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete "{book.title}"?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the book and all its historical loan records. Books with active loans or pending reservations cannot be deleted.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteBook.isPending}
+            >
+              {deleteBook.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
