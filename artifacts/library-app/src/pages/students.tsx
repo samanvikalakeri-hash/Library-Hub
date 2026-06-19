@@ -1,18 +1,24 @@
-import { useListStudents, useCreateStudent, useUpdateStudent, useDeleteStudent, getListStudentsQueryKey } from "@workspace/api-client-react";
+import {
+  useListStudents, useCreateStudent, useUpdateStudent, useDeleteStudent,
+  useListLoans, useReturnLoan,
+  getListStudentsQueryKey, getListLoansQueryKey,
+} from "@workspace/api-client-react";
 import { useState } from "react";
 import { useDebounce } from "@/hooks/use-debounce";
-import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Search, Plus, Edit, Trash2, MoreHorizontal, GraduationCap } from "lucide-react";
+import { Search, Plus, Edit, Trash2, MoreHorizontal, GraduationCap, ChevronDown, BookOpen, HandCoins } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
 
@@ -30,19 +36,24 @@ export default function Students() {
   const debouncedSearch = useDebounce(search, 300);
   const { data: students, isLoading } = useListStudents({ search: debouncedSearch });
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [expandedStudentId, setExpandedStudentId] = useState<number | null>(null);
+
+  const toggleExpand = (id: number) => {
+    setExpandedStudentId((prev) => (prev === id ? null : id));
+  };
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight text-foreground">Student Roster</h1>
-          <p className="text-muted-foreground mt-1">Manage library patrons and their accounts.</p>
+          <p className="text-muted-foreground mt-1">Manage library patrons. Click any row to expand book details.</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search students..." 
+            <Input
+              placeholder="Search students..."
               className="pl-8 w-64 bg-card"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -66,6 +77,7 @@ export default function Students() {
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8"></TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Student ID</TableHead>
               <TableHead>Email</TableHead>
@@ -79,6 +91,7 @@ export default function Students() {
             {isLoading ? (
               Array.from({ length: 5 }).map((_, i) => (
                 <TableRow key={i}>
+                  <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-40" /></TableCell>
@@ -90,34 +103,57 @@ export default function Students() {
               ))
             ) : students?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
                   No students found.
                 </TableCell>
               </TableRow>
             ) : (
               students?.map((student) => (
-                <TableRow key={student.id}>
-                  <TableCell className="font-medium">
-                    <Link href={`/students/${student.id}`} className="hover:underline flex items-center gap-2">
-                      {student.name}
-                    </Link>
-                  </TableCell>
-                  <TableCell className="font-mono text-muted-foreground text-xs">{student.studentId}</TableCell>
-                  <TableCell>{student.email}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1.5 text-muted-foreground">
-                      <GraduationCap className="h-4 w-4" />
-                      {student.graduationYear}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right font-medium">{student.activeLoansCount} / {student.borrowLimit}</TableCell>
-                  <TableCell className={`text-right font-medium ${student.totalFinesOwed && student.totalFinesOwed > 0 ? "text-destructive" : ""}`}>
-                    ${student.totalFinesOwed?.toFixed(2) || "0.00"}
-                  </TableCell>
-                  <TableCell>
-                    <StudentActions student={student} />
-                  </TableCell>
-                </TableRow>
+                <>
+                  <TableRow
+                    key={student.id}
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => toggleExpand(student.id)}
+                  >
+                    <TableCell>
+                      <ChevronDown
+                        className={`h-4 w-4 text-muted-foreground transition-transform duration-200 ${
+                          expandedStudentId === student.id ? "rotate-180" : ""
+                        }`}
+                      />
+                    </TableCell>
+                    <TableCell className="font-medium">{student.name}</TableCell>
+                    <TableCell className="font-mono text-muted-foreground text-xs">{student.studentId}</TableCell>
+                    <TableCell>{student.email}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <GraduationCap className="h-4 w-4" />
+                        {student.graduationYear}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {student.activeLoansCount} / {student.borrowLimit}
+                    </TableCell>
+                    <TableCell
+                      className={`text-right font-medium ${
+                        student.totalFinesOwed && student.totalFinesOwed > 0 ? "text-destructive" : ""
+                      }`}
+                    >
+                      ₹{student.totalFinesOwed?.toFixed(2) || "0.00"}
+                    </TableCell>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <StudentActions student={student} />
+                    </TableCell>
+                  </TableRow>
+
+                  {expandedStudentId === student.id && (
+                    <TableRow key={`${student.id}-expanded`}>
+                      <TableCell colSpan={8} className="p-0 border-t-0">
+                        <StudentLoanDetails studentId={student.id} studentName={student.name} />
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </>
               ))
             )}
           </TableBody>
@@ -127,32 +163,191 @@ export default function Students() {
   );
 }
 
+function StudentLoanDetails({ studentId, studentName }: { studentId: number; studentName: string }) {
+  const { data: loans, isLoading } = useListLoans({ studentId });
+  const returnLoan = useReturnLoan();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  const activeLoans = loans?.filter((l) => l.status === "active" || l.status === "overdue") ?? [];
+  const history = loans?.filter((l) => l.status === "returned") ?? [];
+
+  const handleCollect = (loanId: number, bookTitle: string) => {
+    returnLoan.mutate(
+      { id: loanId },
+      {
+        onSuccess: () => {
+          toast({
+            title: `Book collected from ${studentName}`,
+            description: `"${bookTitle}" marked as returned.`,
+          });
+          queryClient.invalidateQueries({ queryKey: getListLoansQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+        },
+        onError: () =>
+          toast({ title: "Failed to collect book", variant: "destructive" }),
+      }
+    );
+  };
+
+  return (
+    <div className="bg-muted/20 border-t px-6 py-4 space-y-5">
+      <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
+        <BookOpen className="h-4 w-4 text-teal-600" />
+        Book Details for {studentName}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-2">
+          {[...Array(2)].map((_, i) => <Skeleton key={i} className="h-8 w-full" />)}
+        </div>
+      ) : (
+        <>
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+              Currently Borrowed ({activeLoans.length})
+            </p>
+            {activeLoans.length === 0 ? (
+              <p className="text-sm text-muted-foreground italic pl-2">No active loans.</p>
+            ) : (
+              <div className="rounded-md border bg-card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40">
+                      <TableHead>Book Title</TableHead>
+                      <TableHead>Author</TableHead>
+                      <TableHead>Checked Out</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">On-Spot Collect</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {activeLoans.map((loan) => (
+                      <TableRow key={loan.id}>
+                        <TableCell className="font-medium">{loan.bookTitle ?? "—"}</TableCell>
+                        <TableCell className="text-muted-foreground text-sm">{loan.bookAuthor ?? "—"}</TableCell>
+                        <TableCell className="text-sm">
+                          {format(new Date(loan.checkedOutAt), "MMM d, yyyy")}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          <span className={loan.status === "overdue" ? "text-red-600 font-semibold" : ""}>
+                            {format(new Date(loan.dueDate), "MMM d, yyyy")}
+                          </span>
+                          {loan.status === "overdue" && (
+                            <span className="ml-1 text-xs text-red-500">(Overdue)</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={loan.status === "overdue" ? "destructive" : "secondary"}
+                            className="capitalize"
+                          >
+                            {loan.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-teal-200 text-teal-700 hover:bg-teal-50 hover:text-teal-800"
+                            disabled={returnLoan.isPending}
+                            onClick={() => handleCollect(loan.id, loan.bookTitle ?? "Book")}
+                          >
+                            <HandCoins className="h-3 w-3 mr-1" />
+                            Collect Book
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+
+          {history.length > 0 && (
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-2">
+                Borrowing History ({history.length})
+              </p>
+              <div className="rounded-md border bg-card overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/40">
+                      <TableHead>Book Title</TableHead>
+                      <TableHead>Author</TableHead>
+                      <TableHead>Checked Out</TableHead>
+                      <TableHead>Returned</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {history.map((loan) => (
+                      <TableRow key={loan.id} className="text-muted-foreground">
+                        <TableCell className="font-medium text-foreground">{loan.bookTitle ?? "—"}</TableCell>
+                        <TableCell className="text-sm">{loan.bookAuthor ?? "—"}</TableCell>
+                        <TableCell className="text-sm">
+                          {format(new Date(loan.checkedOutAt), "MMM d, yyyy")}
+                        </TableCell>
+                        <TableCell className="text-sm">
+                          {loan.returnedAt
+                            ? format(new Date(loan.returnedAt), "MMM d, yyyy")
+                            : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
+          {activeLoans.length === 0 && history.length === 0 && (
+            <p className="text-sm text-muted-foreground italic pl-2">This student has no loan records.</p>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function StudentActions({ student }: { student: any }) {
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const deleteStudent = useDeleteStudent();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
   const handleDelete = () => {
-    if (confirm(`Are you sure you want to delete ${student.name}?`)) {
-      deleteStudent.mutate({ id: student.id }, {
-        onSuccess: () => {
-          toast({ title: "Student deleted" });
-          queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
-        }
-      });
-    }
+    deleteStudent.mutate({ id: student.id }, {
+      onSuccess: () => {
+        toast({ title: "Student deleted" });
+        queryClient.invalidateQueries({ queryKey: getListStudentsQueryKey() });
+        setIsDeleteOpen(false);
+      },
+      onError: (err: any) => {
+        const msg = err?.data?.error ?? "This student has active loans or records.";
+        toast({ title: "Cannot delete student", description: msg, variant: "destructive" });
+        setIsDeleteOpen(false);
+      },
+    });
   };
 
   return (
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onSelect={() => setIsEditOpen(true)}><Edit className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-          <DropdownMenuItem onSelect={handleDelete} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setIsEditOpen(true)}>
+            <Edit className="mr-2 h-4 w-4" /> Edit
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setIsDeleteOpen(true)} className="text-destructive">
+            <Trash2 className="mr-2 h-4 w-4" /> Delete
+          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 
@@ -164,6 +359,27 @@ function StudentActions({ student }: { student: any }) {
           <StudentForm student={student} onSuccess={() => setIsEditOpen(false)} />
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete {student.name}?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the student and all their records from the system.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteStudent.isPending}
+            >
+              {deleteStudent.isPending ? "Deleting…" : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }

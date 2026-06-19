@@ -41,7 +41,7 @@ export default function Dashboard() {
         />
         <StatCard 
           title="Fines Owed" 
-          value={summary?.totalFinesOwed ? `$${summary.totalFinesOwed.toFixed(2)}` : "$0.00"} 
+          value={summary?.totalFinesOwed ? `₹${summary.totalFinesOwed.toFixed(2)}` : "₹0.00"} 
           loading={loadingSummary} 
           icon={<Wallet className="h-4 w-4 text-muted-foreground" />} 
         />

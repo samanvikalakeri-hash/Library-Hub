@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Info } from "lucide-react";
 
 export default function Fines() {
   const [status, setStatus] = useState<string>("unpaid");
@@ -48,6 +48,14 @@ export default function Fines() {
               <SelectItem value="paid">Paid Only</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      </div>
+
+      <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+        <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
+        <div>
+          <span className="font-semibold">How the Actions column works: </span>
+          Unpaid fines show a green <span className="font-semibold">Mark Paid</span> button. Click it after you physically collect the fine amount from the student — it records the payment, moves the fine to &quot;Paid&quot; status, and removes it from the unpaid list. Once marked paid the action cannot be undone.
         </div>
       </div>
 
@@ -96,7 +104,7 @@ export default function Fines() {
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">{fine.reason}</TableCell>
                   <TableCell>{format(new Date(fine.createdAt), 'MMM d, yyyy')}</TableCell>
-                  <TableCell className="text-right font-bold">${fine.amount.toFixed(2)}</TableCell>
+                  <TableCell className="text-right font-bold">₹{fine.amount.toFixed(2)}</TableCell>
                   <TableCell className="text-center">
                     {fine.paid ? (
                       <Badge variant="outline" className="bg-muted text-muted-foreground">Paid</Badge>
@@ -105,11 +113,15 @@ export default function Fines() {
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    {!fine.paid && (
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
-                        className="h-8 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800 dark:border-emerald-800 dark:text-emerald-400 dark:hover:bg-emerald-900/30"
+                    {fine.paid ? (
+                      <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-medium">
+                        <CheckCircle2 className="h-3.5 w-3.5" /> Collected
+                      </span>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                         disabled={clearFine.isPending}
                         onClick={() => handleClear(fine.id)}
                       >

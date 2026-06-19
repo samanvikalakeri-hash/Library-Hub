@@ -85,7 +85,7 @@ export default function MyAccount() {
         <Card className="text-center">
           <CardContent className="pt-6 pb-4">
             <AlertTriangle className="h-6 w-6 text-red-500 mx-auto mb-1" />
-            <p className="text-2xl font-bold text-red-600">${totalOwed.toFixed(2)}</p>
+            <p className="text-2xl font-bold text-red-600">₹{totalOwed.toFixed(2)}</p>
             <p className="text-xs text-muted-foreground">Fines Owed</p>
           </CardContent>
         </Card>
@@ -195,7 +195,7 @@ export default function MyAccount() {
               <CardTitle className="text-base flex justify-between items-center">
                 <span>My Fines</span>
                 {totalOwed > 0 && (
-                  <span className="text-red-600 font-bold">Total: ${totalOwed.toFixed(2)}</span>
+                  <span className="text-red-600 font-bold">Total: ₹{totalOwed.toFixed(2)}</span>
                 )}
               </CardTitle>
             </CardHeader>
@@ -219,7 +219,7 @@ export default function MyAccount() {
                       <TableRow key={fine.id}>
                         <TableCell className="font-medium">{fine.bookTitle ?? "—"}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{fine.reason}</TableCell>
-                        <TableCell className="font-medium text-red-600">${Number(fine.amount).toFixed(2)}</TableCell>
+                        <TableCell className="font-medium text-red-600">₹{Number(fine.amount).toFixed(2)}</TableCell>
                         <TableCell>
                           {fine.paid ? (
                             <span className="inline-flex items-center gap-1 text-xs text-emerald-700 font-medium">
