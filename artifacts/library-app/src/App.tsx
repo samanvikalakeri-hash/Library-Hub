@@ -17,6 +17,7 @@ import Reservations from "@/pages/reservations";
 import Fines from "@/pages/fines";
 import Catalog from "@/pages/catalog";
 import MyAccount from "@/pages/my-account";
+import Notifications from "@/pages/notifications";
 import { Loader2 } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -66,6 +67,7 @@ function Router() {
             <Route path="/reservations" component={Reservations} />
             <Route path="/catalog" component={Catalog} />
             <Route path="/my-account" component={MyAccount} />
+            <Route path="/notifications" component={Notifications} />
             <Route>
               {isLibrarian ? <NotFound /> : <Redirect to="/my-account" />}
             </Route>

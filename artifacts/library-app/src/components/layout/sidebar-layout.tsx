@@ -1,8 +1,9 @@
 import { Link, useLocation } from "wouter";
 import { useAuth } from "@/lib/auth-context";
-import { 
-  Sidebar, 
-  SidebarContent, 
+import { useUnreadCount } from "@/pages/notifications";
+import {
+  Sidebar,
+  SidebarContent,
   SidebarHeader,
   SidebarGroup,
   SidebarGroupLabel,
@@ -13,8 +14,9 @@ import {
   SidebarProvider,
   SidebarFooter
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, BookCopy, Users, ClipboardList, Clock, Receipt, Library, LogOut, User } from "lucide-react";
+import { LayoutDashboard, BookCopy, Users, ClipboardList, Clock, Receipt, Library, LogOut, User, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 
 const librarianNavItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -29,13 +31,25 @@ const librarianNavItems = [
 const studentNavItems = [
   { href: "/catalog", label: "Book Catalog", icon: Library },
   { href: "/my-account", label: "My Account", icon: User },
+  { href: "/notifications", label: "Notifications", icon: Bell },
 ];
+
+function NotificationBadge() {
+  const count = useUnreadCount();
+  if (count === 0) return null;
+  return (
+    <Badge className="ml-auto h-5 min-w-5 px-1.5 text-[10px] bg-teal-600 hover:bg-teal-600 text-white">
+      {count > 9 ? "9+" : count}
+    </Badge>
+  );
+}
 
 export function SidebarLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
 
   const navItems = user?.role === "librarian" ? librarianNavItems : studentNavItems;
+  const isStudent = user?.role === "student";
 
   return (
     <SidebarProvider>
@@ -61,9 +75,10 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
                     return (
                       <SidebarMenuItem key={item.href}>
                         <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
-                          <Link href={item.href}>
+                          <Link href={item.href} className="flex items-center w-full">
                             <Icon className="h-4 w-4" />
-                            <span>{item.label}</span>
+                            <span className="flex-1">{item.label}</span>
+                            {item.href === "/notifications" && isStudent && <NotificationBadge />}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>

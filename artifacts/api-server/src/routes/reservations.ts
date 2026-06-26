@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and } from "drizzle-orm";
-import { db, reservationsTable, studentsTable, booksTable } from "@workspace/db";
+import { db, reservationsTable, studentsTable, booksTable, notificationsTable } from "@workspace/db";
 import {
   ListReservationsQueryParams,
   ListReservationsResponse,
@@ -84,6 +84,24 @@ router.patch("/reservations/:id", async (req, res): Promise<void> => {
   }
   const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, reservation.studentId));
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, reservation.bookId));
+
+  // Send notification to student when reservation is fulfilled or denied
+  if (parsed.data.status === "fulfilled") {
+    await db.insert(notificationsTable).values({
+      studentId: reservation.studentId,
+      message: `Your reservation for "${book?.title ?? "a book"}" has been approved! Please visit the library to pick it up.`,
+      type: "success",
+      read: false,
+    });
+  } else if (parsed.data.status === "cancelled") {
+    await db.insert(notificationsTable).values({
+      studentId: reservation.studentId,
+      message: `Your reservation for "${book?.title ?? "a book"}" was not fulfilled. Please contact the library for more information.`,
+      type: "warning",
+      read: false,
+    });
+  }
+
   res.json(UpdateReservationResponse.parse(serializeDates({
     ...reservation,
     studentName: student?.name,

@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Info, Plus, ChevronsUpDown, Check } from "lucide-react";
+import { CheckCircle2, Info, Plus, ChevronsUpDown, Check, Calculator, IndianRupee } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type PendingPayment = { id: number; studentName: string; bookTitle: string; amount: number };
@@ -75,8 +75,8 @@ export default function Fines() {
         <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
         <div>
           <span className="font-semibold">How the Actions column works: </span>
-          Unpaid fines show a green <span className="font-semibold">Mark Paid</span> button. Click it after you physically collect the fine amount from the student — a confirmation dialog will appear before recording the payment.
-          Use <span className="font-semibold">Collect Fine</span> to record an on-spot payment not tied to a specific loan.
+          Unpaid fines show a green <span className="font-semibold">Mark Paid</span> button. Click it after collecting the fine — a confirmation dialog will appear.
+          Use <span className="font-semibold">Collect Fine</span> to record an on-spot payment with either a fixed amount or a per-day rate.
         </div>
       </div>
 
@@ -213,6 +213,10 @@ export default function Fines() {
   );
 }
 
+// ─── Collect Fine Dialog ───────────────────────────────────────────────────────
+
+type FineMode = "direct" | "perday";
+
 function CollectFineDialog({
   open,
   onOpenChange,
@@ -225,46 +229,59 @@ function CollectFineDialog({
   const { data: students } = useListStudents();
   const { toast } = useToast();
 
+  const [fineMode, setFineMode] = useState<FineMode>("direct");
+
+  // Student picker
   const [studentPopoverOpen, setStudentPopoverOpen] = useState(false);
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
   const [studentSearch, setStudentSearch] = useState("");
+
+  // Direct amount mode
   const [amount, setAmount] = useState("");
+
+  // Per-day mode
+  const [ratePerDay, setRatePerDay] = useState("");
+  const [numDays, setNumDays] = useState("");
+
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const selectedStudent = students?.find((s) => s.id === selectedStudentId);
 
+  // Computed final amount — days must be a whole number
+  const parsedDays = Math.floor(parseFloat(numDays || "0"));
+  const computedAmount: number = fineMode === "perday"
+    ? parseFloat(ratePerDay || "0") * parsedDays
+    : parseFloat(amount || "0");
+  const daysWarning = fineMode === "perday" && numDays !== "" && parsedDays !== parseFloat(numDays);
+
   const filteredStudents = useMemo(() => {
-    if (!students) return [];
     const q = studentSearch.toLowerCase();
-    return students.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.studentId.toLowerCase().includes(q)
+    return (students ?? []).filter(
+      (s) => s.name.toLowerCase().includes(q) || s.studentId.toLowerCase().includes(q)
     );
   }, [students, studentSearch]);
 
   const reset = () => {
+    setFineMode("direct");
     setSelectedStudentId(null);
     setStudentSearch("");
     setStudentPopoverOpen(false);
     setAmount("");
+    setRatePerDay("");
+    setNumDays("");
     setReason("");
     setSubmitting(false);
   };
 
-  const handleClose = () => {
-    onOpenChange(false);
-    reset();
-  };
+  const handleClose = () => { onOpenChange(false); reset(); };
 
   const handleSubmit = async () => {
     if (!selectedStudentId) {
       toast({ title: "Select a student", variant: "destructive" });
       return;
     }
-    const amt = parseFloat(amount);
-    if (!amt || amt <= 0) {
+    if (!computedAmount || computedAmount <= 0) {
       toast({ title: "Enter a valid amount", variant: "destructive" });
       return;
     }
@@ -278,7 +295,12 @@ function CollectFineDialog({
       const res = await fetch("/api/fines", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ studentId: selectedStudentId, amount: amt, reason: reason.trim(), collectNow: true }),
+        body: JSON.stringify({
+          studentId: selectedStudentId,
+          amount: computedAmount,
+          reason: reason.trim(),
+          collectNow: true,
+        }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -286,7 +308,7 @@ function CollectFineDialog({
       }
       toast({
         title: "Fine collected",
-        description: `₹${amt.toFixed(2)} collected from ${selectedStudent?.name} and recorded.`,
+        description: `₹${computedAmount.toFixed(2)} collected from ${selectedStudent?.name} and recorded.`,
       });
       onSuccess();
       handleClose();
@@ -296,6 +318,8 @@ function CollectFineDialog({
       setSubmitting(false);
     }
   };
+
+  const canSubmit = !!selectedStudentId && computedAmount > 0 && !!reason && !submitting;
 
   return (
     <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
@@ -345,9 +369,7 @@ function CollectFineDialog({
                             setStudentPopoverOpen(false);
                           }}
                         >
-                          <Check
-                            className={cn("mr-2 h-4 w-4", selectedStudentId === s.id ? "opacity-100" : "opacity-0")}
-                          />
+                          <Check className={cn("mr-2 h-4 w-4", selectedStudentId === s.id ? "opacity-100" : "opacity-0")} />
                           <span className="font-medium">{s.name}</span>
                           <span className="ml-2 text-xs text-muted-foreground">{s.studentId}</span>
                         </CommandItem>
@@ -359,19 +381,82 @@ function CollectFineDialog({
             </Popover>
           </div>
 
-          {/* Amount */}
+          {/* Fine mode toggle */}
           <div className="space-y-1.5">
-            <Label htmlFor="fine-amount">Amount (₹)</Label>
-            <Input
-              id="fine-amount"
-              type="number"
-              min="0.01"
-              step="0.01"
-              placeholder="e.g. 50.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
+            <Label>Fine Type</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={fineMode === "direct" ? "default" : "outline"}
+                size="sm"
+                className="w-full"
+                onClick={() => setFineMode("direct")}
+              >
+                <IndianRupee className="h-3.5 w-3.5 mr-1.5" /> Direct Amount
+              </Button>
+              <Button
+                type="button"
+                variant={fineMode === "perday" ? "default" : "outline"}
+                size="sm"
+                className="w-full"
+                onClick={() => setFineMode("perday")}
+              >
+                <Calculator className="h-3.5 w-3.5 mr-1.5" /> Per-Day Rate
+              </Button>
+            </div>
           </div>
+
+          {/* Amount fields */}
+          {fineMode === "direct" ? (
+            <div className="space-y-1.5">
+              <Label htmlFor="fine-amount">Amount (₹)</Label>
+              <Input
+                id="fine-amount"
+                type="number"
+                min="0.01"
+                step="0.01"
+                placeholder="e.g. 50.00"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="rate-per-day">Rate per day (₹)</Label>
+                <Input
+                  id="rate-per-day"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="e.g. 5.00"
+                  value={ratePerDay}
+                  onChange={(e) => setRatePerDay(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="num-days">Number of days</Label>
+                <Input
+                  id="num-days"
+                  type="number"
+                  min="1"
+                  step="1"
+                  placeholder="e.g. 7"
+                  value={numDays}
+                  onChange={(e) => setNumDays(e.target.value)}
+                />
+              </div>
+              {computedAmount > 0 && (
+                <div className="col-span-2 text-sm text-muted-foreground">
+                  Calculated total:{" "}
+                  <span className="font-bold text-foreground">₹{computedAmount.toFixed(2)}</span>
+                  <span className="ml-1 text-xs">
+                    ({ratePerDay}/day × {numDays} days)
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Reason */}
           <div className="space-y-1.5">
@@ -385,13 +470,17 @@ function CollectFineDialog({
           </div>
 
           {/* Summary */}
-          {selectedStudent && amount && parseFloat(amount) > 0 && (
+          {selectedStudent && computedAmount > 0 && (
             <div className="rounded-md border bg-emerald-50 border-emerald-200 px-4 py-3 space-y-1 text-sm">
               <p className="font-semibold text-emerald-800">Collection summary</p>
               <p className="text-emerald-700">
-                <span className="font-medium">{selectedStudent.name}</span> ({selectedStudent.studentId})
+                <span className="font-medium">{selectedStudent.name}</span>{" "}
+                <span className="text-xs text-emerald-600">({selectedStudent.studentId})</span>
               </p>
-              <p className="text-lg font-bold text-emerald-700">₹{parseFloat(amount || "0").toFixed(2)}</p>
+              <p className="text-lg font-bold text-emerald-700">₹{computedAmount.toFixed(2)}</p>
+              {fineMode === "perday" && ratePerDay && numDays && (
+                <p className="text-xs text-emerald-600">₹{ratePerDay}/day × {numDays} days</p>
+              )}
               {reason && <p className="text-xs text-emerald-600">{reason}</p>}
             </div>
           )}
@@ -403,7 +492,7 @@ function CollectFineDialog({
             <Button
               className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={handleSubmit}
-              disabled={submitting || !selectedStudentId || !amount || !reason}
+              disabled={!canSubmit}
             >
               {submitting ? "Recording…" : "Collect & Record"}
             </Button>

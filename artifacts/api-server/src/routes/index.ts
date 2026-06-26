@@ -7,6 +7,7 @@ import loansRouter from "./loans";
 import reservationsRouter from "./reservations";
 import finesRouter from "./fines";
 import dashboardRouter from "./dashboard";
+import notificationsRouter from "./notifications";
 
 const router: IRouter = Router();
 
@@ -18,5 +19,6 @@ router.use(loansRouter);
 router.use(reservationsRouter);
 router.use(finesRouter);
 router.use(dashboardRouter);
+router.use(notificationsRouter);
 
 export default router;
