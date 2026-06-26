@@ -8,11 +8,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle2, Info } from "lucide-react";
 
+type PendingPayment = { id: number; studentName: string; bookTitle: string; amount: number };
+
 export default function Fines() {
   const [status, setStatus] = useState<string>("unpaid");
+  const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
@@ -20,13 +24,19 @@ export default function Fines() {
   const { data: fines, isLoading } = useListFines({ paid: isPaid });
   const clearFine = useClearFine();
 
-  const handleClear = (id: number) => {
-    clearFine.mutate({ id }, {
+  const confirmPayment = () => {
+    if (!pendingPayment) return;
+    clearFine.mutate({ id: pendingPayment.id }, {
       onSuccess: () => {
-        toast({ title: "Fine marked as paid" });
+        toast({ title: "Fine marked as paid", description: `₹${pendingPayment.amount.toFixed(2)} collected from ${pendingPayment.studentName}.` });
         queryClient.invalidateQueries({ queryKey: getListFinesQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
-      }
+        setPendingPayment(null);
+      },
+      onError: () => {
+        toast({ title: "Failed to mark fine as paid", variant: "destructive" });
+        setPendingPayment(null);
+      },
     });
   };
 
@@ -55,7 +65,7 @@ export default function Fines() {
         <Info className="h-4 w-4 mt-0.5 shrink-0 text-blue-500" />
         <div>
           <span className="font-semibold">How the Actions column works: </span>
-          Unpaid fines show a green <span className="font-semibold">Mark Paid</span> button. Click it after you physically collect the fine amount from the student — it records the payment, moves the fine to &quot;Paid&quot; status, and removes it from the unpaid list. Once marked paid the action cannot be undone.
+          Unpaid fines show a green <span className="font-semibold">Mark Paid</span> button. Click it after you physically collect the fine amount from the student — a confirmation dialog will appear before recording the payment.
         </div>
       </div>
 
@@ -123,7 +133,12 @@ export default function Fines() {
                         variant="outline"
                         className="h-8 border-emerald-200 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
                         disabled={clearFine.isPending}
-                        onClick={() => handleClear(fine.id)}
+                        onClick={() => setPendingPayment({
+                          id: fine.id,
+                          studentName: fine.studentName ?? 'Student',
+                          bookTitle: fine.bookTitle ?? 'Book',
+                          amount: fine.amount,
+                        })}
                       >
                         <CheckCircle2 className="h-3.5 w-3.5 mr-1" /> Mark Paid
                       </Button>
@@ -135,6 +150,39 @@ export default function Fines() {
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog open={!!pendingPayment} onOpenChange={(v) => { if (!v) setPendingPayment(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Fine Collection</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-3">
+                <p>
+                  Confirm that you have physically collected the fine from{" "}
+                  <span className="font-semibold text-foreground">{pendingPayment?.studentName}</span>?
+                </p>
+                <div className="rounded-md border bg-muted/40 px-4 py-3 space-y-1 text-foreground">
+                  <p className="text-sm font-medium">{pendingPayment?.bookTitle}</p>
+                  <p className="text-lg font-bold text-emerald-700">₹{pendingPayment?.amount.toFixed(2)}</p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  This action cannot be undone. The fine will be moved to "Paid" status.
+                </p>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmPayment}
+              disabled={clearFine.isPending}
+              className="bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              {clearFine.isPending ? "Processing…" : "Yes, Mark as Paid"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

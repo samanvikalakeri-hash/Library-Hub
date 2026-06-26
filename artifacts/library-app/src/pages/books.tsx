@@ -14,9 +14,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Search, Plus, Edit, Trash2, MoreHorizontal } from "lucide-react";
+import { Search, Plus, Edit, Trash2, MoreHorizontal, ScanLine } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
+import { IsbnScanner } from "@/components/isbn-scanner";
 
 const bookSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -34,6 +35,7 @@ export default function Books() {
   const debouncedSearch = useDebounce(search, 300);
   const { data: books, isLoading } = useListBooks({ search: debouncedSearch });
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isScannerOpen, setIsScannerOpen] = useState(false);
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-6">
@@ -52,6 +54,9 @@ export default function Books() {
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
+          <Button variant="outline" onClick={() => setIsScannerOpen(true)}>
+            <ScanLine className="mr-2 h-4 w-4" /> Scan ISBN
+          </Button>
           <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
             <DialogTrigger asChild>
               <Button><Plus className="mr-2 h-4 w-4" /> Add Book</Button>
@@ -65,6 +70,8 @@ export default function Books() {
           </Dialog>
         </div>
       </div>
+
+      <IsbnScanner open={isScannerOpen} onOpenChange={setIsScannerOpen} />
 
       <div className="border rounded-md bg-card">
         <Table>
