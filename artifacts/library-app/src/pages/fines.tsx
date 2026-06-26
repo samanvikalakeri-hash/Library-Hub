@@ -294,6 +294,7 @@ function CollectFineDialog({
     try {
       const res = await fetch("/api/fines", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           studentId: selectedStudentId,

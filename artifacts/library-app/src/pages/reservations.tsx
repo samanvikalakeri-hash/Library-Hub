@@ -170,7 +170,7 @@ export default function Reservations() {
               {pendingAction?.action === 'fulfilled' ? (
                 <>
                   Mark the reservation for <span className="font-semibold">"{pendingAction?.bookTitle}"</span> by{" "}
-                  <span className="font-semibold">{pendingAction?.studentName}</span> as fulfilled? This means the book has been handed to the student.
+                  <span className="font-semibold">{pendingAction?.studentName}</span> as fulfilled?
                 </>
               ) : (
                 <>

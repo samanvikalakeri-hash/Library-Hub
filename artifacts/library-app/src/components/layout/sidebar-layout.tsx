@@ -14,7 +14,7 @@ import {
   SidebarProvider,
   SidebarFooter
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, BookCopy, Users, ClipboardList, Clock, Receipt, Library, LogOut, User, Bell } from "lucide-react";
+import { LayoutDashboard, BookCopy, Users, ClipboardList, BookPlus, Clock, Receipt, Library, LogOut, User, Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -23,6 +23,7 @@ const librarianNavItems = [
   { href: "/books", label: "Book Inventory", icon: BookCopy },
   { href: "/students", label: "Student Details", icon: Users },
   { href: "/loans", label: "Transaction Details", icon: ClipboardList },
+  { href: "/lending", label: "Lend a Book", icon: BookPlus },
   { href: "/reservations", label: "Reservations", icon: Clock },
   { href: "/fines", label: "Fines", icon: Receipt },
   { href: "/catalog", label: "Student Catalog", icon: Library },

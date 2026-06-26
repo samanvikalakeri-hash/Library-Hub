@@ -13,6 +13,7 @@ import BookDetail from "@/pages/book-detail";
 import Students from "@/pages/students";
 import StudentDetail from "@/pages/student-detail";
 import Loans from "@/pages/loans";
+import Lending from "@/pages/lending";
 import Reservations from "@/pages/reservations";
 import Fines from "@/pages/fines";
 import Catalog from "@/pages/catalog";
@@ -63,6 +64,7 @@ function Router() {
             {isLibrarian && <Route path="/students" component={Students} />}
             {isLibrarian && <Route path="/students/:id" component={StudentDetail} />}
             {isLibrarian && <Route path="/loans" component={Loans} />}
+            {isLibrarian && <Route path="/lending" component={Lending} />}
             {isLibrarian && <Route path="/fines" component={Fines} />}
             <Route path="/reservations" component={Reservations} />
             <Route path="/catalog" component={Catalog} />
