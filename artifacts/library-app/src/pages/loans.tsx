@@ -8,28 +8,38 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Undo2 } from "lucide-react";
 
+type PendingReturn = { id: number; studentId: number; bookId: number; bookTitle: string; studentName: string };
+
 export default function Loans() {
   const [status, setStatus] = useState<string>("all");
+  const [pendingReturn, setPendingReturn] = useState<PendingReturn | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
-  // API accepts 'active', 'returned', 'overdue'. We map 'all' to undefined.
   const apiStatus = status === "all" ? undefined : (status as any);
   const { data: loans, isLoading } = useListLoans({ status: apiStatus });
   const returnLoan = useReturnLoan();
 
-  const handleReturn = (id: number, studentId: number, bookId: number) => {
+  const confirmReturn = () => {
+    if (!pendingReturn) return;
+    const { id, studentId, bookId, bookTitle } = pendingReturn;
     returnLoan.mutate({ id }, {
       onSuccess: () => {
-        toast({ title: "Book marked as returned" });
+        toast({ title: `"${bookTitle}" marked as returned` });
         queryClient.invalidateQueries({ queryKey: getListLoansQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
         queryClient.invalidateQueries({ queryKey: getGetStudentQueryKey(studentId) });
         queryClient.invalidateQueries({ queryKey: getGetBookQueryKey(bookId) });
-      }
+        setPendingReturn(null);
+      },
+      onError: () => {
+        toast({ title: "Failed to return book", variant: "destructive" });
+        setPendingReturn(null);
+      },
     });
   };
 
@@ -63,6 +73,7 @@ export default function Loans() {
               <TableHead>Student</TableHead>
               <TableHead>Checked Out</TableHead>
               <TableHead>Due Date</TableHead>
+              <TableHead>Returned</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="text-right">Action</TableHead>
             </TableRow>
@@ -75,13 +86,14 @@ export default function Loans() {
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
                   <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
                 </TableRow>
               ))
             ) : loans?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={7} className="text-center py-10 text-muted-foreground">
                   No loans found.
                 </TableCell>
               </TableRow>
@@ -95,8 +107,17 @@ export default function Loans() {
                   <TableCell>
                     <Link href={`/students/${loan.studentId}`} className="hover:underline">{loan.studentName}</Link>
                   </TableCell>
-                  <TableCell>{format(new Date(loan.checkedOutAt), 'MMM d, yyyy')}</TableCell>
-                  <TableCell>{format(new Date(loan.dueDate), 'MMM d, yyyy')}</TableCell>
+                  <TableCell className="text-sm">{format(new Date(loan.checkedOutAt), 'MMM d, yyyy')}</TableCell>
+                  <TableCell className="text-sm">
+                    <span className={loan.status === 'overdue' ? 'text-red-600 font-semibold' : ''}>
+                      {format(new Date(loan.dueDate), 'MMM d, yyyy')}
+                    </span>
+                  </TableCell>
+                  <TableCell className="text-sm text-muted-foreground">
+                    {loan.returnedAt
+                      ? format(new Date(loan.returnedAt), 'MMM d, yyyy')
+                      : <span className="text-muted-foreground/50">—</span>}
+                  </TableCell>
                   <TableCell>
                     <Badge 
                       variant={loan.status === 'overdue' ? 'destructive' : loan.status === 'active' ? 'default' : 'secondary'}
@@ -107,11 +128,17 @@ export default function Loans() {
                   </TableCell>
                   <TableCell className="text-right">
                     {loan.status !== 'returned' && (
-                      <Button 
-                        size="sm" 
-                        variant="outline" 
+                      <Button
+                        size="sm"
+                        variant="outline"
                         disabled={returnLoan.isPending}
-                        onClick={() => handleReturn(loan.id, loan.studentId, loan.bookId)}
+                        onClick={() => setPendingReturn({
+                          id: loan.id,
+                          studentId: loan.studentId,
+                          bookId: loan.bookId,
+                          bookTitle: loan.bookTitle ?? 'Book',
+                          studentName: loan.studentName ?? 'Student',
+                        })}
                       >
                         <Undo2 className="h-3.5 w-3.5 mr-1" /> Return
                       </Button>
@@ -123,6 +150,24 @@ export default function Loans() {
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog open={!!pendingReturn} onOpenChange={(v) => { if (!v) setPendingReturn(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Book Return</AlertDialogTitle>
+            <AlertDialogDescription>
+              Mark <span className="font-semibold">"{pendingReturn?.bookTitle}"</span> as returned by{" "}
+              <span className="font-semibold">{pendingReturn?.studentName}</span>? This will free up a copy for other students.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmReturn} disabled={returnLoan.isPending}>
+              {returnLoan.isPending ? "Processing…" : "Confirm Return"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

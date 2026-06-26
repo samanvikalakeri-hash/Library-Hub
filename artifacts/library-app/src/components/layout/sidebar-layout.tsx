@@ -1,7 +1,5 @@
 import { Link, useLocation } from "wouter";
-import { useState } from "react";
 import { useAuth } from "@/lib/auth-context";
-import { QrScanner } from "@/components/qr-scanner";
 import { 
   Sidebar, 
   SidebarContent, 
@@ -15,13 +13,13 @@ import {
   SidebarProvider,
   SidebarFooter
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, BookCopy, Users, ClipboardList, Clock, Receipt, Library, QrCode, LogOut, User } from "lucide-react";
+import { LayoutDashboard, BookCopy, Users, ClipboardList, Clock, Receipt, Library, LogOut, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 const librarianNavItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/books", label: "Book Inventory", icon: BookCopy },
-  { href: "/students", label: "Student Roster", icon: Users },
+  { href: "/students", label: "Student Details", icon: Users },
   { href: "/loans", label: "Transaction Details", icon: ClipboardList },
   { href: "/reservations", label: "Reservations", icon: Clock },
   { href: "/fines", label: "Fines", icon: Receipt },
@@ -36,7 +34,6 @@ const studentNavItems = [
 export function SidebarLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
-  const [scannerOpen, setScannerOpen] = useState(false);
 
   const navItems = user?.role === "librarian" ? librarianNavItems : studentNavItems;
 
@@ -72,18 +69,6 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
                       </SidebarMenuItem>
                     );
                   })}
-
-                  {user?.role === "librarian" && (
-                    <SidebarMenuItem>
-                      <SidebarMenuButton
-                        onClick={() => setScannerOpen(true)}
-                        tooltip="QR / Barcode Scanner"
-                      >
-                        <QrCode className="h-4 w-4" />
-                        <span>QR Scanner</span>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -110,8 +95,6 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
-
-      <QrScanner open={scannerOpen} onOpenChange={setScannerOpen} />
     </SidebarProvider>
   );
 }

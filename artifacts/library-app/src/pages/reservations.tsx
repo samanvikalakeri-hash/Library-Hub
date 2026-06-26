@@ -8,25 +8,44 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { Check, X } from "lucide-react";
 
+type PendingAction = {
+  id: number;
+  action: "fulfilled" | "cancelled";
+  bookTitle: string;
+  studentName: string;
+};
+
 export default function Reservations() {
   const [status, setStatus] = useState<string>("pending");
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   const apiStatus = status === "all" ? undefined : (status as any);
   const { data: reservations, isLoading } = useListReservations({ status: apiStatus });
   const updateReservation = useUpdateReservation();
 
-  const handleUpdate = (id: number, newStatus: 'fulfilled' | 'cancelled') => {
-    updateReservation.mutate({ id, data: { status: newStatus } }, {
-      onSuccess: () => {
-        toast({ title: `Reservation ${newStatus}` });
-        queryClient.invalidateQueries({ queryKey: getListReservationsQueryKey() });
+  const confirmAction = () => {
+    if (!pendingAction) return;
+    updateReservation.mutate(
+      { id: pendingAction.id, data: { status: pendingAction.action } },
+      {
+        onSuccess: () => {
+          const label = pendingAction.action === "fulfilled" ? "Fulfilled" : "Denied";
+          toast({ title: `Reservation ${label}` });
+          queryClient.invalidateQueries({ queryKey: getListReservationsQueryKey() });
+          setPendingAction(null);
+        },
+        onError: () => {
+          toast({ title: "Action failed", variant: "destructive" });
+          setPendingAction(null);
+        },
       }
-    });
+    );
   };
 
   return (
@@ -70,7 +89,7 @@ export default function Reservations() {
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                   <TableCell><Skeleton className="h-6 w-20 rounded-full" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-8 w-24 ml-auto" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-32 ml-auto" /></TableCell>
                 </TableRow>
               ))
             ) : reservations?.length === 0 ? (
@@ -90,30 +109,46 @@ export default function Reservations() {
                   </TableCell>
                   <TableCell>{format(new Date(res.createdAt), 'MMM d, yyyy')}</TableCell>
                   <TableCell>
-                    <Badge variant={res.status === 'pending' ? 'secondary' : res.status === 'fulfilled' ? 'default' : 'outline'}>
+                    <Badge
+                      variant={
+                        res.status === 'pending' ? 'secondary'
+                          : res.status === 'fulfilled' ? 'default'
+                          : 'outline'
+                      }
+                    >
                       {res.status}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
                     {res.status === 'pending' && (
                       <div className="flex justify-end gap-2">
-                        <Button 
-                          size="sm" 
-                          variant="outline" 
-                          className="h-8"
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-emerald-200 text-emerald-700 hover:bg-emerald-50"
                           disabled={updateReservation.isPending}
-                          onClick={() => handleUpdate(res.id, 'fulfilled')}
+                          onClick={() => setPendingAction({
+                            id: res.id,
+                            action: 'fulfilled',
+                            bookTitle: res.bookTitle ?? 'Book',
+                            studentName: res.studentName ?? 'Student',
+                          })}
                         >
                           <Check className="h-3.5 w-3.5 mr-1" /> Fulfill
                         </Button>
-                        <Button 
-                          size="sm" 
-                          variant="ghost" 
-                          className="h-8 text-muted-foreground hover:text-destructive"
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 border-red-200 text-red-600 hover:bg-red-50"
                           disabled={updateReservation.isPending}
-                          onClick={() => handleUpdate(res.id, 'cancelled')}
+                          onClick={() => setPendingAction({
+                            id: res.id,
+                            action: 'cancelled',
+                            bookTitle: res.bookTitle ?? 'Book',
+                            studentName: res.studentName ?? 'Student',
+                          })}
                         >
-                          <X className="h-3.5 w-3.5" />
+                          <X className="h-3.5 w-3.5 mr-1" /> Deny
                         </Button>
                       </div>
                     )}
@@ -124,6 +159,47 @@ export default function Reservations() {
           </TableBody>
         </Table>
       </div>
+
+      <AlertDialog open={!!pendingAction} onOpenChange={(v) => { if (!v) setPendingAction(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingAction?.action === 'fulfilled' ? 'Fulfill Reservation?' : 'Deny Reservation?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingAction?.action === 'fulfilled' ? (
+                <>
+                  Mark the reservation for <span className="font-semibold">"{pendingAction?.bookTitle}"</span> by{" "}
+                  <span className="font-semibold">{pendingAction?.studentName}</span> as fulfilled? This means the book has been handed to the student.
+                </>
+              ) : (
+                <>
+                  Deny <span className="font-semibold">{pendingAction?.studentName}</span>'s reservation for{" "}
+                  <span className="font-semibold">"{pendingAction?.bookTitle}"</span>? The request will be cancelled.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmAction}
+              disabled={updateReservation.isPending}
+              className={
+                pendingAction?.action === 'cancelled'
+                  ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  : ""
+              }
+            >
+              {updateReservation.isPending
+                ? "Processing…"
+                : pendingAction?.action === 'fulfilled'
+                  ? "Yes, Fulfill"
+                  : "Yes, Deny"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
