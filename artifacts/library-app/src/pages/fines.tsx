@@ -1,25 +1,32 @@
-import { useListFines, useClearFine, getListFinesQueryKey, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
-import { useState } from "react";
+import { useListFines, useClearFine, useListStudents, getListFinesQueryKey, getGetDashboardSummaryQueryKey } from "@workspace/api-client-react";
+import { useState, useMemo } from "react";
 import { Link } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { CheckCircle2, Info } from "lucide-react";
+import { CheckCircle2, Info, Plus, ChevronsUpDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 type PendingPayment = { id: number; studentName: string; bookTitle: string; amount: number };
 
 export default function Fines() {
   const [status, setStatus] = useState<string>("unpaid");
   const [pendingPayment, setPendingPayment] = useState<PendingPayment | null>(null);
+  const [collectOpen, setCollectOpen] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  
+
   const isPaid = status === "all" ? undefined : status === "paid";
   const { data: fines, isLoading } = useListFines({ paid: isPaid });
   const clearFine = useClearFine();
@@ -58,6 +65,9 @@ export default function Fines() {
               <SelectItem value="paid">Paid Only</SelectItem>
             </SelectContent>
           </Select>
+          <Button onClick={() => setCollectOpen(true)}>
+            <Plus className="mr-2 h-4 w-4" /> Collect Fine
+          </Button>
         </div>
       </div>
 
@@ -66,6 +76,7 @@ export default function Fines() {
         <div>
           <span className="font-semibold">How the Actions column works: </span>
           Unpaid fines show a green <span className="font-semibold">Mark Paid</span> button. Click it after you physically collect the fine amount from the student — a confirmation dialog will appear before recording the payment.
+          Use <span className="font-semibold">Collect Fine</span> to record an on-spot payment not tied to a specific loan.
         </div>
       </div>
 
@@ -108,9 +119,13 @@ export default function Fines() {
                     <Link href={`/students/${fine.studentId}`} className="hover:underline">{fine.studentName}</Link>
                   </TableCell>
                   <TableCell>
-                    <Link href={`/books/${fine.loanId}`} className="hover:underline truncate max-w-[200px] block" title={fine.bookTitle || ''}>
-                      {fine.bookTitle}
-                    </Link>
+                    {fine.loanId ? (
+                      <Link href={`/books/${fine.loanId}`} className="hover:underline truncate max-w-[200px] block" title={fine.bookTitle || ''}>
+                        {fine.bookTitle}
+                      </Link>
+                    ) : (
+                      <span className="text-muted-foreground text-sm italic">On-spot</span>
+                    )}
                   </TableCell>
                   <TableCell className="text-muted-foreground text-sm">{fine.reason}</TableCell>
                   <TableCell>{format(new Date(fine.createdAt), 'MMM d, yyyy')}</TableCell>
@@ -151,6 +166,7 @@ export default function Fines() {
         </Table>
       </div>
 
+      {/* Mark-paid confirmation */}
       <AlertDialog open={!!pendingPayment} onOpenChange={(v) => { if (!v) setPendingPayment(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -183,6 +199,217 @@ export default function Fines() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* On-spot fine collection dialog */}
+      <CollectFineDialog
+        open={collectOpen}
+        onOpenChange={setCollectOpen}
+        onSuccess={() => {
+          queryClient.invalidateQueries({ queryKey: getListFinesQueryKey() });
+          queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
+        }}
+      />
     </div>
+  );
+}
+
+function CollectFineDialog({
+  open,
+  onOpenChange,
+  onSuccess,
+}: {
+  open: boolean;
+  onOpenChange: (v: boolean) => void;
+  onSuccess: () => void;
+}) {
+  const { data: students } = useListStudents();
+  const { toast } = useToast();
+
+  const [studentPopoverOpen, setStudentPopoverOpen] = useState(false);
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [amount, setAmount] = useState("");
+  const [reason, setReason] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const selectedStudent = students?.find((s) => s.id === selectedStudentId);
+
+  const filteredStudents = useMemo(() => {
+    if (!students) return [];
+    const q = studentSearch.toLowerCase();
+    return students.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.studentId.toLowerCase().includes(q)
+    );
+  }, [students, studentSearch]);
+
+  const reset = () => {
+    setSelectedStudentId(null);
+    setStudentSearch("");
+    setStudentPopoverOpen(false);
+    setAmount("");
+    setReason("");
+    setSubmitting(false);
+  };
+
+  const handleClose = () => {
+    onOpenChange(false);
+    reset();
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedStudentId) {
+      toast({ title: "Select a student", variant: "destructive" });
+      return;
+    }
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) {
+      toast({ title: "Enter a valid amount", variant: "destructive" });
+      return;
+    }
+    if (!reason.trim()) {
+      toast({ title: "Enter a reason", variant: "destructive" });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const res = await fetch("/api/fines", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ studentId: selectedStudentId, amount: amt, reason: reason.trim(), collectNow: true }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? "Failed to record fine");
+      }
+      toast({
+        title: "Fine collected",
+        description: `₹${amt.toFixed(2)} collected from ${selectedStudent?.name} and recorded.`,
+      });
+      onSuccess();
+      handleClose();
+    } catch (err: any) {
+      toast({ title: err.message ?? "Something went wrong", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) handleClose(); }}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>Collect Fine On-Spot</DialogTitle>
+          <DialogDescription>
+            Record a cash payment collected directly from a student. The fine will be marked as paid immediately.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 pt-1">
+          {/* Student picker */}
+          <div className="space-y-1.5">
+            <Label>Student</Label>
+            <Popover open={studentPopoverOpen} onOpenChange={setStudentPopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={studentPopoverOpen}
+                  className="w-full justify-between font-normal"
+                >
+                  {selectedStudent
+                    ? `${selectedStudent.name} (${selectedStudent.studentId})`
+                    : "Search student by name or ID…"}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="Type name or student ID…"
+                    value={studentSearch}
+                    onValueChange={setStudentSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No students found.</CommandEmpty>
+                    <CommandGroup>
+                      {filteredStudents.map((s) => (
+                        <CommandItem
+                          key={s.id}
+                          value={String(s.id)}
+                          onSelect={() => {
+                            setSelectedStudentId(s.id);
+                            setStudentSearch("");
+                            setStudentPopoverOpen(false);
+                          }}
+                        >
+                          <Check
+                            className={cn("mr-2 h-4 w-4", selectedStudentId === s.id ? "opacity-100" : "opacity-0")}
+                          />
+                          <span className="font-medium">{s.name}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">{s.studentId}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Amount */}
+          <div className="space-y-1.5">
+            <Label htmlFor="fine-amount">Amount (₹)</Label>
+            <Input
+              id="fine-amount"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="e.g. 50.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+            />
+          </div>
+
+          {/* Reason */}
+          <div className="space-y-1.5">
+            <Label htmlFor="fine-reason">Reason</Label>
+            <Input
+              id="fine-reason"
+              placeholder="e.g. Lost book, Damage fee, Overdue…"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </div>
+
+          {/* Summary */}
+          {selectedStudent && amount && parseFloat(amount) > 0 && (
+            <div className="rounded-md border bg-emerald-50 border-emerald-200 px-4 py-3 space-y-1 text-sm">
+              <p className="font-semibold text-emerald-800">Collection summary</p>
+              <p className="text-emerald-700">
+                <span className="font-medium">{selectedStudent.name}</span> ({selectedStudent.studentId})
+              </p>
+              <p className="text-lg font-bold text-emerald-700">₹{parseFloat(amount || "0").toFixed(2)}</p>
+              {reason && <p className="text-xs text-emerald-600">{reason}</p>}
+            </div>
+          )}
+
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" className="flex-1" onClick={handleClose} disabled={submitting}>
+              Cancel
+            </Button>
+            <Button
+              className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
+              onClick={handleSubmit}
+              disabled={submitting || !selectedStudentId || !amount || !reason}
+            >
+              {submitting ? "Recording…" : "Collect & Record"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

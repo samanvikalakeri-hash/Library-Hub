@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useListBooks, useCreateReservation, getListReservationsQueryKey } from "@workspace/api-client-react";
+import { useState, useMemo } from "react";
+import { useListBooks, useCreateReservation, useListStudents, getListReservationsQueryKey } from "@workspace/api-client-react";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
@@ -7,16 +7,24 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Label } from "@/components/ui/label";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { Search, Library, BookOpen, Hash, User } from "lucide-react";
+import { Search, Library, BookOpen, Hash, User, ChevronsUpDown, Check } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function Catalog() {
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounce(search, 300);
   const { data: books, isLoading } = useListBooks({ search: debouncedSearch });
   const { user } = useAuth();
+  const isLibrarian = user?.role === "librarian";
+
+  // Load all students once so every BookCard can use them without N+1 fetches
+  const { data: students } = useListStudents();
 
   return (
     <div className="min-h-screen bg-muted/10">
@@ -31,6 +39,9 @@ export default function Catalog() {
             <div className="flex items-center justify-center gap-2 text-primary-foreground/70 text-sm">
               <User className="h-4 w-4" />
               Browsing as <span className="font-semibold text-primary-foreground">{user.name}</span>
+              {isLibrarian && (
+                <span className="text-primary-foreground/50 text-xs">(librarian — you'll select the student when reserving)</span>
+              )}
             </div>
           )}
           <div className="max-w-xl mx-auto relative mt-8">
@@ -68,7 +79,14 @@ export default function Catalog() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {books?.map((book) => (
-              <BookCard key={book.id} book={book} studentId={user?.studentRecordId ?? null} studentName={user?.name ?? "You"} />
+              <BookCard
+                key={book.id}
+                book={book}
+                isLibrarian={isLibrarian}
+                defaultStudentId={user?.studentRecordId ?? null}
+                defaultStudentName={user?.name ?? ""}
+                students={students ?? []}
+              />
             ))}
           </div>
         )}
@@ -79,12 +97,16 @@ export default function Catalog() {
 
 function BookCard({
   book,
-  studentId,
-  studentName,
+  isLibrarian,
+  defaultStudentId,
+  defaultStudentName,
+  students,
 }: {
   book: any;
-  studentId: number | null | undefined;
-  studentName: string;
+  isLibrarian: boolean;
+  defaultStudentId: number | null | undefined;
+  defaultStudentName: string;
+  students: any[];
 }) {
   const isAvailable = book.availableCopies > 0;
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -92,25 +114,66 @@ function BookCard({
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Student picker state (used by librarians, or when student has no linked record)
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [studentSearch, setStudentSearch] = useState("");
+  const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+  const [selectedStudentName, setSelectedStudentName] = useState<string>("");
+
+  // For students: resolved from their session. For librarians: from the picker.
+  const resolvedStudentId = isLibrarian ? selectedStudentId : defaultStudentId;
+  const resolvedStudentName = isLibrarian
+    ? selectedStudentName || "—"
+    : defaultStudentName;
+
+  const filteredStudents = useMemo(() => {
+    const q = studentSearch.toLowerCase();
+    return students.filter(
+      (s) =>
+        s.name.toLowerCase().includes(q) ||
+        s.studentId.toLowerCase().includes(q)
+    );
+  }, [students, studentSearch]);
+
+  const resetLibrarianPicker = () => {
+    setSelectedStudentId(null);
+    setSelectedStudentName("");
+    setStudentSearch("");
+    setPickerOpen(false);
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    if (!open) resetLibrarianPicker();
+    setConfirmOpen(open);
+  };
+
   const handleConfirmReserve = () => {
-    if (!studentId) {
-      toast({ title: "Cannot reserve", description: "No student account linked.", variant: "destructive" });
+    if (!resolvedStudentId) {
+      toast({
+        title: "No student selected",
+        description: isLibrarian
+          ? "Please search for and select a student before reserving."
+          : "No student account linked to your session.",
+        variant: "destructive",
+      });
       return;
     }
     createReservation.mutate(
-      { data: { studentId, bookId: book.id } },
+      { data: { studentId: resolvedStudentId, bookId: book.id } },
       {
         onSuccess: () => {
           toast({
             title: "Reservation placed!",
-            description: `"${book.title}" has been reserved for ${studentName}.`,
+            description: `"${book.title}" has been reserved for ${resolvedStudentName}.`,
           });
           queryClient.invalidateQueries({ queryKey: getListReservationsQueryKey() });
+          resetLibrarianPicker();
           setConfirmOpen(false);
         },
         onError: (err: any) => {
           const msg = err?.data?.error ?? "Could not place reservation. You may already have one for this book.";
           toast({ title: "Reservation failed", description: msg, variant: "destructive" });
+          resetLibrarianPicker();
           setConfirmOpen(false);
         },
       }
@@ -160,7 +223,7 @@ function BookCard({
         </CardFooter>
       </Card>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialog open={confirmOpen} onOpenChange={handleDialogClose}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Reservation</AlertDialogTitle>
@@ -174,10 +237,71 @@ function BookCard({
                   <p className="text-sm text-muted-foreground">by {book.author}</p>
                   <p className="text-xs text-muted-foreground">ISBN: {book.isbn}</p>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-foreground">
-                  <User className="h-4 w-4 text-muted-foreground" />
-                  Reserved for: <span className="font-semibold">{studentName}</span>
-                </div>
+
+                {/* Student section */}
+                {isLibrarian ? (
+                  <div className="space-y-1.5">
+                    <Label className="text-foreground flex items-center gap-1.5">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      Reserve for student
+                    </Label>
+                    <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={pickerOpen}
+                          className="w-full justify-between font-normal"
+                        >
+                          {selectedStudentId && selectedStudentName
+                            ? selectedStudentName
+                            : "Search by name or student ID…"}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0" align="start">
+                        <Command shouldFilter={false}>
+                          <CommandInput
+                            placeholder="Type name or student ID…"
+                            value={studentSearch}
+                            onValueChange={setStudentSearch}
+                          />
+                          <CommandList>
+                            <CommandEmpty>No students found.</CommandEmpty>
+                            <CommandGroup>
+                              {filteredStudents.map((s) => (
+                                <CommandItem
+                                  key={s.id}
+                                  value={String(s.id)}
+                                  onSelect={() => {
+                                    setSelectedStudentId(s.id);
+                                    setSelectedStudentName(`${s.name} (${s.studentId})`);
+                                    setStudentSearch("");
+                                    setPickerOpen(false);
+                                  }}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      selectedStudentId === s.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <span className="font-medium">{s.name}</span>
+                                  <span className="ml-2 text-xs text-muted-foreground">{s.studentId}</span>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-foreground">
+                    <User className="h-4 w-4 text-muted-foreground" />
+                    Reserved for: <span className="font-semibold">{resolvedStudentName}</span>
+                  </div>
+                )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -185,7 +309,7 @@ function BookCard({
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmReserve}
-              disabled={createReservation.isPending}
+              disabled={createReservation.isPending || (isLibrarian && !selectedStudentId)}
             >
               {createReservation.isPending ? "Placing…" : "Confirm Reservation"}
             </AlertDialogAction>

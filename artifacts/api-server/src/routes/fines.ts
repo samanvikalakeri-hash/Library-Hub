@@ -4,6 +4,8 @@ import { db, finesTable, studentsTable, loansTable, booksTable } from "@workspac
 import {
   ListFinesQueryParams,
   ListFinesResponse,
+  CreateFineBody,
+  CreateFineResponse,
   ClearFineParams,
   ClearFineResponse,
 } from "@workspace/api-zod";
@@ -46,7 +48,55 @@ router.get("/fines", async (req, res): Promise<void> => {
   res.json(ListFinesResponse.parse(serializeDates(mapped)));
 });
 
+router.post("/fines", async (req, res): Promise<void> => {
+  if (req.session.role !== "librarian") {
+    res.status(403).json({ error: "Librarian access required" });
+    return;
+  }
+  const body = CreateFineBody.safeParse(req.body);
+  if (!body.success) {
+    res.status(400).json({ error: body.error.message });
+    return;
+  }
+  const { studentId, amount, reason, collectNow } = body.data;
+
+  // Verify student exists
+  const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, studentId));
+  if (!student) {
+    res.status(404).json({ error: "Student not found" });
+    return;
+  }
+
+  const now = new Date();
+  const [fine] = await db
+    .insert(finesTable)
+    .values({
+      studentId,
+      loanId: null,
+      amount: amount.toFixed(2),
+      reason,
+      paid: collectNow ?? false,
+      paidAt: collectNow ? now : null,
+    })
+    .returning();
+
+  res.status(201).json(
+    CreateFineResponse.parse(
+      serializeDates({
+        ...fine,
+        amount: parseFloat(fine.amount as string),
+        studentName: student.name,
+        bookTitle: null,
+      })
+    )
+  );
+});
+
 router.post("/fines/:id/clear", async (req, res): Promise<void> => {
+  if (req.session.role !== "librarian") {
+    res.status(403).json({ error: "Librarian access required" });
+    return;
+  }
   const params = ClearFineParams.safeParse(req.params);
   if (!params.success) {
     res.status(400).json({ error: params.error.message });
@@ -62,14 +112,19 @@ router.post("/fines/:id/clear", async (req, res): Promise<void> => {
     return;
   }
   const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, fine.studentId));
-  const [loan] = await db.select().from(loansTable).where(eq(loansTable.id, fine.loanId));
-  const bookRows = loan ? await db.select().from(booksTable).where(eq(booksTable.id, loan.bookId)) : [];
-  const book = bookRows[0];
+  const bookRows = fine.loanId
+    ? await db
+        .select({ title: booksTable.title })
+        .from(loansTable)
+        .leftJoin(booksTable, eq(loansTable.bookId, booksTable.id))
+        .where(eq(loansTable.id, fine.loanId))
+    : [];
+  const bookTitle = bookRows[0]?.title ?? null;
   res.json(ClearFineResponse.parse(serializeDates({
     ...fine,
     amount: parseFloat(fine.amount as string),
-    studentName: student?.name,
-    bookTitle: book?.title,
+    studentName: student?.name ?? null,
+    bookTitle,
   })));
 });
 

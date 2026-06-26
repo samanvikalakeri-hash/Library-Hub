@@ -416,7 +416,7 @@ export const ListFinesQueryParams = zod.object({
 export const ListFinesResponseItem = zod.object({
   "id": zod.number(),
   "studentId": zod.number(),
-  "loanId": zod.number(),
+  "loanId": zod.number().nullish(),
   "amount": zod.number(),
   "reason": zod.string(),
   "paid": zod.boolean(),
@@ -429,6 +429,30 @@ export const ListFinesResponse = zod.array(ListFinesResponseItem)
 
 
 /**
+ * @summary Create a new fine (on-spot collection)
+ */
+export const CreateFineBody = zod.object({
+  "studentId": zod.number(),
+  "amount": zod.number().positive(),
+  "reason": zod.string().min(1),
+  "collectNow": zod.boolean().optional()
+})
+
+export const CreateFineResponse = zod.object({
+  "id": zod.number(),
+  "studentId": zod.number(),
+  "loanId": zod.number().nullish(),
+  "amount": zod.number(),
+  "reason": zod.string(),
+  "paid": zod.boolean(),
+  "paidAt": zod.string().nullish(),
+  "createdAt": zod.string(),
+  "studentName": zod.string().nullish(),
+  "bookTitle": zod.string().nullish()
+})
+
+
+/**
  * @summary Mark a fine as paid/cleared
  */
 export const ClearFineParams = zod.object({
@@ -438,7 +462,7 @@ export const ClearFineParams = zod.object({
 export const ClearFineResponse = zod.object({
   "id": zod.number(),
   "studentId": zod.number(),
-  "loanId": zod.number(),
+  "loanId": zod.number().nullish(),
   "amount": zod.number(),
   "reason": zod.string(),
   "paid": zod.boolean(),

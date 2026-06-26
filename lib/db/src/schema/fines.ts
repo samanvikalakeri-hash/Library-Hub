@@ -7,7 +7,7 @@ import { loansTable } from "./loans";
 export const finesTable = pgTable("fines", {
   id: serial("id").primaryKey(),
   studentId: integer("student_id").notNull().references(() => studentsTable.id),
-  loanId: integer("loan_id").notNull().references(() => loansTable.id),
+  loanId: integer("loan_id").references(() => loansTable.id),
   amount: numeric("amount", { precision: 8, scale: 2 }).notNull(),
   reason: text("reason").notNull(),
   paid: boolean("paid").notNull().default(false),
