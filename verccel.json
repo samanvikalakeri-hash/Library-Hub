@@ -1,13 +1,12 @@
 {
-  "installCommand": "pnpm install",
   "buildCommand": "pnpm --filter @workspace/library-app run build",
   "outputDirectory": "artifacts/library-app/dist/public",
+  "env": {
+    "PORT": "3000",
+    "BASE_PATH": "/"
+  },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" }
-  ],
-  "functions": {
-    "api/index.ts": {
-      "runtime": "@vercel/node@4"
-    }
-  }
+    { "source": "/api/(.*)", "destination": "https://library-api-drze.onrender.com/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
