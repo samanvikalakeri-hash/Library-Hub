@@ -6,7 +6,8 @@
     "BASE_PATH": "/"
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "https://library-api-drze.onrender.com/api/$1" },
+    { "source": "/api/(.*)", "destination": "https://library-api-7lv2.onrender.com/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
+
