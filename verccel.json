@@ -5,9 +5,6 @@
     "PORT": "3000",
     "BASE_PATH": "/"
   },
-  "typescript": {
-    "ignoreBuildErrors": true
-  },
   "rewrites": [
     { "source": "/api/(.*)", "destination": "https://library-api-7lv2.onrender.com/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
