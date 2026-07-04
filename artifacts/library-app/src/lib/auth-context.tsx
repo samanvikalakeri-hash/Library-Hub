@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-export type AuthRole = "librarian" | "student";
+export type AuthRole = "librarian" | "student" | "teacher";
 
 export interface AuthUser {
   id: string;
   role: AuthRole;
   name: string;
   studentRecordId: number | null;
+  teacherRecordId: number | null;
 }
 
 interface AuthContextValue {
@@ -17,10 +18,11 @@ interface AuthContextValue {
 }
 
 export interface LoginPayload {
-  role: "librarian" | "student";
+  role: "librarian" | "student" | "teacher";
   username?: string;
   password?: string;
   studentId?: string;
+  teacherId?: string;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);

@@ -2,7 +2,7 @@ import {
   useCreateLoan, useListStudents, useListBooks,
   getListLoansQueryKey, getGetDashboardSummaryQueryKey, getListBooksQueryKey,
 } from "@workspace/api-client-react";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format, addWeeks, addMonths } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,11 @@ import { Label } from "@/components/ui/label";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { BookPlus, ChevronsUpDown, Check, Calendar, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import type { Teacher } from "@workspace/api-client-react";
 
 const DUE_DATE_OPTIONS = [
   { label: "1 Week", getValue: () => addWeeks(new Date(), 1) },
@@ -20,25 +22,44 @@ const DUE_DATE_OPTIONS = [
   { label: "1 Month", getValue: () => addMonths(new Date(), 1) },
 ];
 
+function useTeachersList() {
+  const [teachers, setTeachers] = useState<Teacher[]>([]);
+  useEffect(() => {
+    fetch("/api/teachers", { credentials: "include" })
+      .then((r) => r.ok ? r.json() : [])
+      .then(setTeachers)
+      .catch(() => setTeachers([]));
+  }, []);
+  return teachers;
+}
+
 export default function Lending() {
   const { data: students } = useListStudents();
+  const teachers = useTeachersList();
   const { data: books, refetch: refetchBooks } = useListBooks({ available: true });
   const createLoan = useCreateLoan();
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const [borrowerType, setBorrowerType] = useState<"student" | "teacher">("student");
+
   const [studentPopOpen, setStudentPopOpen] = useState(false);
   const [studentSearch, setStudentSearch] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState<number | null>(null);
+
+  const [teacherPopOpen, setTeacherPopOpen] = useState(false);
+  const [teacherSearch, setTeacherSearch] = useState("");
+  const [selectedTeacherId, setSelectedTeacherId] = useState<number | null>(null);
 
   const [bookPopOpen, setBookPopOpen] = useState(false);
   const [bookSearch, setBookSearch] = useState("");
   const [selectedBookId, setSelectedBookId] = useState<number | null>(null);
 
   const [dueDateOption, setDueDateOption] = useState<string>("");
-  const [lastSuccess, setLastSuccess] = useState<{ studentName: string; bookTitle: string; dueDate: Date } | null>(null);
+  const [lastSuccess, setLastSuccess] = useState<{ borrowerName: string; bookTitle: string; dueDate: Date } | null>(null);
 
   const selectedStudent = students?.find((s) => s.id === selectedStudentId);
+  const selectedTeacher = teachers.find((t) => t.id === selectedTeacherId);
   const selectedBook = books?.find((b) => b.id === selectedBookId);
   const dueDateValue = DUE_DATE_OPTIONS.find((o) => o.label === dueDateOption)?.getValue();
 
@@ -48,6 +69,13 @@ export default function Lending() {
       (s) => s.name.toLowerCase().includes(q) || s.studentId.toLowerCase().includes(q)
     );
   }, [students, studentSearch]);
+
+  const filteredTeachers = useMemo(() => {
+    const q = teacherSearch.toLowerCase();
+    return teachers.filter(
+      (t) => t.name.toLowerCase().includes(q) || t.teacherId.toLowerCase().includes(q)
+    );
+  }, [teachers, teacherSearch]);
 
   const filteredBooks = useMemo(() => {
     const q = bookSearch.toLowerCase();
@@ -60,26 +88,40 @@ export default function Lending() {
     setStudentPopOpen(false);
     setStudentSearch("");
     setSelectedStudentId(null);
+    setTeacherPopOpen(false);
+    setTeacherSearch("");
+    setSelectedTeacherId(null);
     setBookPopOpen(false);
     setBookSearch("");
     setSelectedBookId(null);
     setDueDateOption("");
   };
 
+  const borrowerId = borrowerType === "student" ? selectedStudentId : selectedTeacherId;
+  const borrowerName = borrowerType === "student" ? selectedStudent?.name : selectedTeacher?.name;
+  const borrowerId2 = borrowerType === "student" ? selectedStudent?.studentId : selectedTeacher?.teacherId;
+
   const handleSubmit = () => {
-    if (!selectedStudentId || !selectedBookId || !dueDateValue) return;
+    if (!selectedBookId || !dueDateValue) return;
+    if (borrowerType === "student" && !selectedStudentId) return;
+    if (borrowerType === "teacher" && !selectedTeacherId) return;
+
+    const loanData = borrowerType === "student"
+      ? { studentId: selectedStudentId!, bookId: selectedBookId, dueDate: dueDateValue.toISOString() }
+      : { teacherId: selectedTeacherId!, bookId: selectedBookId, dueDate: dueDateValue.toISOString() };
+
     createLoan.mutate(
-      { data: { studentId: selectedStudentId, bookId: selectedBookId, dueDate: dueDateValue.toISOString() } },
+      { data: loanData },
       {
         onSuccess: () => {
           setLastSuccess({
-            studentName: selectedStudent?.name ?? "Student",
+            borrowerName: borrowerName ?? "Borrower",
             bookTitle: selectedBook?.title ?? "Book",
             dueDate: dueDateValue,
           });
           toast({
             title: "Book lent successfully",
-            description: `"${selectedBook?.title}" checked out to ${selectedStudent?.name}. Due ${format(dueDateValue, "MMM d, yyyy")}.`,
+            description: `"${selectedBook?.title}" checked out to ${borrowerName}. Due ${format(dueDateValue, "MMM d, yyyy")}.`,
           });
           queryClient.invalidateQueries({ queryKey: getListLoansQueryKey() });
           queryClient.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() });
@@ -95,7 +137,8 @@ export default function Lending() {
     );
   };
 
-  const canSubmit = !!selectedStudentId && !!selectedBookId && !!dueDateOption && !createLoan.isPending;
+  const canSubmit = !!selectedBookId && !!dueDateOption && !createLoan.isPending &&
+    (borrowerType === "student" ? !!selectedStudentId : !!selectedTeacherId);
 
   return (
     <div className="p-8 max-w-2xl mx-auto space-y-8">
@@ -103,7 +146,7 @@ export default function Lending() {
         <h1 className="text-3xl font-bold tracking-tight text-foreground flex items-center gap-2">
           <BookPlus className="h-7 w-7 text-teal-600" /> Lend a Book
         </h1>
-        <p className="text-muted-foreground mt-1">Check out a book to a student by filling in the form below.</p>
+        <p className="text-muted-foreground mt-1">Check out a book to a student or teacher.</p>
       </div>
 
       {lastSuccess && (
@@ -113,7 +156,7 @@ export default function Lending() {
             <p className="font-semibold">Book lent successfully</p>
             <p>
               <span className="font-medium">"{lastSuccess.bookTitle}"</span> checked out to{" "}
-              <span className="font-medium">{lastSuccess.studentName}</span>. Due{" "}
+              <span className="font-medium">{lastSuccess.borrowerName}</span>. Due{" "}
               <span className="font-medium">{format(lastSuccess.dueDate, "MMMM d, yyyy")}</span>.
             </p>
           </div>
@@ -121,47 +164,93 @@ export default function Lending() {
             className="ml-auto text-emerald-500 hover:text-emerald-700 text-lg leading-none"
             onClick={() => setLastSuccess(null)}
             aria-label="Dismiss"
-          >
-            ×
-          </button>
+          >×</button>
         </div>
       )}
 
       <div className="rounded-xl border bg-card p-6 space-y-6 shadow-sm">
         <div className="space-y-1.5">
-          <Label className="text-sm font-medium">Student</Label>
-          <Popover open={studentPopOpen} onOpenChange={setStudentPopOpen}>
-            <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-10">
-                {selectedStudent
-                  ? `${selectedStudent.name} (${selectedStudent.studentId})`
-                  : "Search by name or student ID…"}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-full p-0" align="start">
-              <Command shouldFilter={false}>
-                <CommandInput placeholder="Name or ID…" value={studentSearch} onValueChange={setStudentSearch} />
-                <CommandList>
-                  <CommandEmpty>No students found.</CommandEmpty>
-                  <CommandGroup>
-                    {filteredStudents.map((s) => (
-                      <CommandItem key={s.id} value={String(s.id)} onSelect={() => {
-                        setSelectedStudentId(s.id);
-                        setStudentSearch("");
-                        setStudentPopOpen(false);
-                      }}>
-                        <Check className={cn("mr-2 h-4 w-4", selectedStudentId === s.id ? "opacity-100" : "opacity-0")} />
-                        <span className="font-medium">{s.name}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">{s.studentId}</span>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+          <Label className="text-sm font-medium">Borrower Type</Label>
+          <Tabs value={borrowerType} onValueChange={(v) => { setBorrowerType(v as "student" | "teacher"); setSelectedStudentId(null); setSelectedTeacherId(null); }}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="student">Student</TabsTrigger>
+              <TabsTrigger value="teacher">Teacher</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
+
+        {borrowerType === "student" ? (
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Student</Label>
+            <Popover open={studentPopOpen} onOpenChange={setStudentPopOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-10">
+                  {selectedStudent
+                    ? `${selectedStudent.name} (${selectedStudent.studentId})`
+                    : "Search by name or student ID…"}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput placeholder="Name or ID…" value={studentSearch} onValueChange={setStudentSearch} />
+                  <CommandList>
+                    <CommandEmpty>No students found.</CommandEmpty>
+                    <CommandGroup>
+                      {filteredStudents.map((s) => (
+                        <CommandItem key={s.id} value={String(s.id)} onSelect={() => {
+                          setSelectedStudentId(s.id);
+                          setStudentSearch("");
+                          setStudentPopOpen(false);
+                        }}>
+                          <Check className={cn("mr-2 h-4 w-4", selectedStudentId === s.id ? "opacity-100" : "opacity-0")} />
+                          <span className="font-medium">{s.name}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">{s.studentId}</span>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+        ) : (
+          <div className="space-y-1.5">
+            <Label className="text-sm font-medium">Teacher</Label>
+            <Popover open={teacherPopOpen} onOpenChange={setTeacherPopOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between font-normal h-10">
+                  {selectedTeacher
+                    ? `${selectedTeacher.name} (${selectedTeacher.teacherId})`
+                    : "Search by name or teacher ID…"}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" align="start">
+                <Command shouldFilter={false}>
+                  <CommandInput placeholder="Name or ID…" value={teacherSearch} onValueChange={setTeacherSearch} />
+                  <CommandList>
+                    <CommandEmpty>No teachers found.</CommandEmpty>
+                    <CommandGroup>
+                      {filteredTeachers.map((t) => (
+                        <CommandItem key={t.id} value={String(t.id)} onSelect={() => {
+                          setSelectedTeacherId(t.id);
+                          setTeacherSearch("");
+                          setTeacherPopOpen(false);
+                        }}>
+                          <Check className={cn("mr-2 h-4 w-4", selectedTeacherId === t.id ? "opacity-100" : "opacity-0")} />
+                          <span className="font-medium">{t.name}</span>
+                          <span className="ml-2 text-xs text-muted-foreground">{t.teacherId}</span>
+                          {t.subject && <span className="ml-1 text-xs text-muted-foreground">· {t.subject}</span>}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <Label className="text-sm font-medium">
@@ -219,12 +308,13 @@ export default function Lending() {
           </Select>
         </div>
 
-        {selectedStudent && selectedBook && dueDateValue && (
+        {(selectedStudent || selectedTeacher) && selectedBook && dueDateValue && (
           <div className="rounded-lg border bg-teal-50 border-teal-200 px-4 py-3 space-y-1 text-sm">
             <p className="font-semibold text-teal-800">Loan summary</p>
             <p className="text-teal-700">
-              <span className="font-medium">{selectedStudent.name}</span>{" "}
-              <span className="text-xs text-teal-600">({selectedStudent.studentId})</span>
+              <span className="font-medium">{borrowerName}</span>{" "}
+              <span className="text-xs text-teal-600">({borrowerId2})</span>
+              <span className="ml-1 text-xs text-teal-500">· {borrowerType}</span>
             </p>
             <p className="font-medium text-teal-900">{selectedBook.title}</p>
             <p className="text-xs text-teal-600">
@@ -238,7 +328,7 @@ export default function Lending() {
             variant="outline"
             className="flex-1"
             onClick={reset}
-            disabled={createLoan.isPending || (!selectedStudentId && !selectedBookId && !dueDateOption)}
+            disabled={createLoan.isPending || (!borrowerId && !selectedBookId && !dueDateOption)}
           >
             Clear
           </Button>

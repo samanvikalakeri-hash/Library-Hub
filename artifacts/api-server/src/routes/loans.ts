@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, loansTable, booksTable, studentsTable, finesTable } from "@workspace/db";
+import { db, loansTable, booksTable, studentsTable, teachersTable, finesTable } from "@workspace/db";
 import {
   ListLoansQueryParams,
   ListLoansResponse,
@@ -29,6 +29,29 @@ async function updateOverdueStatuses() {
     );
 }
 
+function buildLoanRow(loan: {
+  id: number;
+  studentId: number | null;
+  teacherId: number | null;
+  bookId: number;
+  checkedOutAt: Date;
+  dueDate: Date;
+  returnedAt: Date | null;
+  status: string;
+  studentName: string | null;
+  teacherName: string | null;
+  bookTitle: string | null;
+  bookAuthor: string | null;
+}) {
+  const borrowerType = loan.teacherId ? "teacher" : "student";
+  const borrowerName = loan.teacherName ?? loan.studentName ?? null;
+  return {
+    ...loan,
+    borrowerType,
+    borrowerName,
+  };
+}
+
 router.get("/loans", async (req, res): Promise<void> => {
   await updateOverdueStatuses();
   const parsed = ListLoansQueryParams.safeParse(req.query);
@@ -36,31 +59,35 @@ router.get("/loans", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { status, studentId } = parsed.data;
+  const { status, studentId, teacherId } = parsed.data;
   const conditions = [];
   if (status) conditions.push(eq(loansTable.status, status));
   if (studentId) conditions.push(eq(loansTable.studentId, studentId));
+  if (teacherId) conditions.push(eq(loansTable.teacherId, teacherId));
 
   const loans = await db
     .select({
       id: loansTable.id,
       studentId: loansTable.studentId,
+      teacherId: loansTable.teacherId,
       bookId: loansTable.bookId,
       checkedOutAt: loansTable.checkedOutAt,
       dueDate: loansTable.dueDate,
       returnedAt: loansTable.returnedAt,
       status: loansTable.status,
       studentName: studentsTable.name,
+      teacherName: teachersTable.name,
       bookTitle: booksTable.title,
       bookAuthor: booksTable.author,
     })
     .from(loansTable)
     .leftJoin(studentsTable, eq(loansTable.studentId, studentsTable.id))
+    .leftJoin(teachersTable, eq(loansTable.teacherId, teachersTable.id))
     .leftJoin(booksTable, eq(loansTable.bookId, booksTable.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .orderBy(sql`${loansTable.checkedOutAt} desc`);
 
-  res.json(ListLoansResponse.parse(serializeDates(loans)));
+  res.json(ListLoansResponse.parse(serializeDates(loans.map(buildLoanRow))));
 });
 
 router.post("/loans", async (req, res): Promise<void> => {
@@ -69,7 +96,12 @@ router.post("/loans", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { studentId, bookId, dueDate } = parsed.data;
+  const { studentId, teacherId, bookId, dueDate } = parsed.data;
+
+  if (!studentId && !teacherId) {
+    res.status(400).json({ error: "Either studentId or teacherId is required" });
+    return;
+  }
 
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, bookId));
   if (!book) {
@@ -81,25 +113,53 @@ router.post("/loans", async (req, res): Promise<void> => {
     return;
   }
 
-  const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, studentId));
-  if (!student) {
-    res.status(404).json({ error: "Student not found" });
-    return;
+  let borrowerName: string | null = null;
+
+  if (studentId) {
+    const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, studentId));
+    if (!student) {
+      res.status(404).json({ error: "Student not found" });
+      return;
+    }
+    const [activeCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(loansTable)
+      .where(and(eq(loansTable.studentId, studentId), sql`${loansTable.status} != 'returned'`));
+    if ((activeCount?.count ?? 0) >= student.borrowLimit) {
+      res.status(400).json({ error: `Student has reached their borrow limit of ${student.borrowLimit}` });
+      return;
+    }
+    borrowerName = student.name;
   }
-  const [activeCount] = await db
-    .select({ count: sql<number>`count(*)::int` })
-    .from(loansTable)
-    .where(and(eq(loansTable.studentId, studentId), sql`${loansTable.status} != 'returned'`));
-  if ((activeCount?.count ?? 0) >= student.borrowLimit) {
-    res.status(400).json({ error: `Student has reached their borrow limit of ${student.borrowLimit}` });
-    return;
+
+  if (teacherId) {
+    const [teacher] = await db.select().from(teachersTable).where(eq(teachersTable.id, teacherId));
+    if (!teacher) {
+      res.status(404).json({ error: "Teacher not found" });
+      return;
+    }
+    const [activeCount] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(loansTable)
+      .where(and(eq(loansTable.teacherId, teacherId), sql`${loansTable.status} != 'returned'`));
+    if ((activeCount?.count ?? 0) >= teacher.borrowLimit) {
+      res.status(400).json({ error: `Teacher has reached their borrow limit of ${teacher.borrowLimit}` });
+      return;
+    }
+    borrowerName = teacher.name;
   }
 
   const due = dueDate ? new Date(dueDate) : new Date(Date.now() + LOAN_DAYS * 86400000);
 
   const [loan] = await db
     .insert(loansTable)
-    .values({ studentId, bookId, dueDate: due, status: "active" })
+    .values({
+      studentId: studentId ?? null,
+      teacherId: teacherId ?? null,
+      bookId,
+      dueDate: due,
+      status: "active",
+    })
     .returning();
 
   await db
@@ -109,9 +169,10 @@ router.post("/loans", async (req, res): Promise<void> => {
 
   res.status(201).json(GetLoanResponse.parse(serializeDates({
     ...loan,
-    studentName: student.name,
-    bookTitle: book.title,
-    bookAuthor: book.author,
+    studentName: studentId ? borrowerName : null,
+    teacherName: teacherId ? borrowerName : null,
+    borrowerName,
+    borrowerType: teacherId ? "teacher" : "student",
   })));
 });
 
@@ -125,17 +186,20 @@ router.get("/loans/:id", async (req, res): Promise<void> => {
     .select({
       id: loansTable.id,
       studentId: loansTable.studentId,
+      teacherId: loansTable.teacherId,
       bookId: loansTable.bookId,
       checkedOutAt: loansTable.checkedOutAt,
       dueDate: loansTable.dueDate,
       returnedAt: loansTable.returnedAt,
       status: loansTable.status,
       studentName: studentsTable.name,
+      teacherName: teachersTable.name,
       bookTitle: booksTable.title,
       bookAuthor: booksTable.author,
     })
     .from(loansTable)
     .leftJoin(studentsTable, eq(loansTable.studentId, studentsTable.id))
+    .leftJoin(teachersTable, eq(loansTable.teacherId, teachersTable.id))
     .leftJoin(booksTable, eq(loansTable.bookId, booksTable.id))
     .where(eq(loansTable.id, params.data.id));
 
@@ -143,7 +207,7 @@ router.get("/loans/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Loan not found" });
     return;
   }
-  res.json(GetLoanResponse.parse(serializeDates(loan)));
+  res.json(GetLoanResponse.parse(serializeDates(buildLoanRow(loan))));
 });
 
 router.post("/loans/:id/return", async (req, res): Promise<void> => {
@@ -175,7 +239,7 @@ router.post("/loans/:id/return", async (req, res): Promise<void> => {
     .set({ availableCopies: sql`${booksTable.availableCopies} + 1` })
     .where(eq(booksTable.id, existing.bookId));
 
-  if (now > existing.dueDate) {
+  if (existing.studentId && now > existing.dueDate) {
     const daysLate = Math.ceil((now.getTime() - existing.dueDate.getTime()) / 86400000);
     const amount = (daysLate * FINE_PER_DAY).toFixed(2);
     await db.insert(finesTable).values({
@@ -187,14 +251,25 @@ router.post("/loans/:id/return", async (req, res): Promise<void> => {
     });
   }
 
-  const [student] = await db.select().from(studentsTable).where(eq(studentsTable.id, loan.studentId));
+  const [student] = existing.studentId
+    ? await db.select().from(studentsTable).where(eq(studentsTable.id, existing.studentId))
+    : [null];
+  const [teacher] = existing.teacherId
+    ? await db.select().from(teachersTable).where(eq(teachersTable.id, existing.teacherId))
+    : [null];
   const [book] = await db.select().from(booksTable).where(eq(booksTable.id, loan.bookId));
+
+  const borrowerType = existing.teacherId ? "teacher" : "student";
+  const borrowerName = teacher?.name ?? student?.name ?? null;
 
   res.json(ReturnLoanResponse.parse(serializeDates({
     ...loan,
-    studentName: student?.name,
-    bookTitle: book?.title,
-    bookAuthor: book?.author,
+    studentName: student?.name ?? null,
+    teacherName: teacher?.name ?? null,
+    borrowerName,
+    borrowerType,
+    bookTitle: book?.title ?? null,
+    bookAuthor: book?.author ?? null,
   })));
 });
 

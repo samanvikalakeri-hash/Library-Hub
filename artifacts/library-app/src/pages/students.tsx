@@ -27,6 +27,9 @@ const studentSchema = z.object({
   email: z.string().email("Valid email is required"),
   studentId: z.string().min(1, "Student ID is required"),
   phone: z.string().optional(),
+  grade: z.string().optional(),
+  section: z.string().optional(),
+  rollNumber: z.string().optional(),
   graduationYear: z.coerce.number().min(2000, "Valid year required"),
   borrowLimit: z.coerce.number().min(1).max(20).default(5),
 });
@@ -63,7 +66,7 @@ export default function Students() {
             <DialogTrigger asChild>
               <Button><Plus className="mr-2 h-4 w-4" /> Add Student</Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-lg">
               <DialogHeader>
                 <DialogTitle>Add New Student</DialogTitle>
               </DialogHeader>
@@ -80,6 +83,7 @@ export default function Students() {
               <TableHead className="w-8"></TableHead>
               <TableHead>Name</TableHead>
               <TableHead>Student ID</TableHead>
+              <TableHead>Class / Section</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Graduation</TableHead>
               <TableHead className="text-right">Active Loans</TableHead>
@@ -94,6 +98,7 @@ export default function Students() {
                   <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                  <TableCell><Skeleton className="h-4 w-20" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-40" /></TableCell>
                   <TableCell><Skeleton className="h-4 w-16" /></TableCell>
                   <TableCell className="text-right"><Skeleton className="h-4 w-8 ml-auto" /></TableCell>
@@ -103,7 +108,7 @@ export default function Students() {
               ))
             ) : students?.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
                   No students found.
                 </TableCell>
               </TableRow>
@@ -124,6 +129,11 @@ export default function Students() {
                     </TableCell>
                     <TableCell className="font-medium">{student.name}</TableCell>
                     <TableCell className="font-mono text-muted-foreground text-xs">{student.studentId}</TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
+                      {student.grade && student.section
+                        ? `${student.grade} – ${student.section}${student.rollNumber ? ` (${student.rollNumber})` : ""}`
+                        : student.grade ?? student.section ?? "—"}
+                    </TableCell>
                     <TableCell>{student.email}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1.5 text-muted-foreground">
@@ -148,7 +158,7 @@ export default function Students() {
 
                   {expandedStudentId === student.id && (
                     <TableRow key={`${student.id}-expanded`}>
-                      <TableCell colSpan={8} className="p-0 border-t-0">
+                      <TableCell colSpan={9} className="p-0 border-t-0">
                         <StudentLoanDetails studentId={student.id} studentName={student.name} />
                       </TableCell>
                     </TableRow>
@@ -352,7 +362,7 @@ function StudentActions({ student }: { student: any }) {
       </DropdownMenu>
 
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Edit Student</DialogTitle>
           </DialogHeader>
@@ -397,6 +407,9 @@ function StudentForm({ student, onSuccess }: { student?: any; onSuccess: () => v
       email: student.email,
       studentId: student.studentId,
       phone: student.phone || "",
+      grade: student.grade || "",
+      section: student.section || "",
+      rollNumber: student.rollNumber || "",
       graduationYear: student.graduationYear,
       borrowLimit: student.borrowLimit,
     } : {
@@ -404,6 +417,9 @@ function StudentForm({ student, onSuccess }: { student?: any; onSuccess: () => v
       email: "",
       studentId: "",
       phone: "",
+      grade: "",
+      section: "",
+      rollNumber: "",
       graduationYear: new Date().getFullYear() + 4,
       borrowLimit: 5,
     }
@@ -473,6 +489,41 @@ function StudentForm({ student, onSuccess }: { student?: any; onSuccess: () => v
             )}
           />
         </div>
+        <div className="grid grid-cols-3 gap-3">
+          <FormField
+            control={form.control}
+            name="grade"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Class</FormLabel>
+                <FormControl><Input {...field} placeholder="e.g. 10" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="section"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Section</FormLabel>
+                <FormControl><Input {...field} placeholder="e.g. A" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="rollNumber"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Roll No.</FormLabel>
+                <FormControl><Input {...field} placeholder="e.g. 12" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
         <div className="grid grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -497,6 +548,17 @@ function StudentForm({ student, onSuccess }: { student?: any; onSuccess: () => v
             )}
           />
         </div>
+        <FormField
+          control={form.control}
+          name="phone"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Phone (optional)</FormLabel>
+              <FormControl><Input {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
         <Button type="submit" className="w-full" disabled={createStudent.isPending || updateStudent.isPending}>
           {student ? "Update Student" : "Add Student"}
         </Button>

@@ -14,7 +14,7 @@ import {
   SidebarProvider,
   SidebarFooter
 } from "@/components/ui/sidebar";
-import { LayoutDashboard, BookCopy, Users, ClipboardList, BookPlus, Clock, Receipt, Library, LogOut, User, Bell } from "lucide-react";
+import { LayoutDashboard, BookCopy, Users, ClipboardList, BookPlus, Clock, Receipt, Library, LogOut, User, Bell, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
@@ -22,6 +22,7 @@ const librarianNavItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/books", label: "Book Inventory", icon: BookCopy },
   { href: "/students", label: "Student Details", icon: Users },
+  { href: "/teachers", label: "Teachers", icon: GraduationCap },
   { href: "/loans", label: "Transaction Details", icon: ClipboardList },
   { href: "/lending", label: "Lend a Book", icon: BookPlus },
   { href: "/reservations", label: "Reservations", icon: Clock },
@@ -33,6 +34,11 @@ const studentNavItems = [
   { href: "/catalog", label: "Book Catalog", icon: Library },
   { href: "/my-account", label: "My Account", icon: User },
   { href: "/notifications", label: "Notifications", icon: Bell },
+];
+
+const teacherNavItems = [
+  { href: "/catalog", label: "Book Catalog", icon: Library },
+  { href: "/my-account", label: "My Account", icon: User },
 ];
 
 function NotificationBadge() {
@@ -49,8 +55,18 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
   const [location] = useLocation();
   const { user, logout } = useAuth();
 
-  const navItems = user?.role === "librarian" ? librarianNavItems : studentNavItems;
+  const navItems = user?.role === "librarian"
+    ? librarianNavItems
+    : user?.role === "teacher"
+    ? teacherNavItems
+    : studentNavItems;
+
   const isStudent = user?.role === "student";
+  const portalLabel = user?.role === "librarian"
+    ? "Library Management"
+    : user?.role === "teacher"
+    ? "Teacher Portal"
+    : "Student Portal";
 
   return (
     <SidebarProvider>
@@ -65,9 +81,7 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
 
           <SidebarContent>
             <SidebarGroup>
-              <SidebarGroupLabel>
-                {user?.role === "librarian" ? "Library Management" : "Student Portal"}
-              </SidebarGroupLabel>
+              <SidebarGroupLabel>{portalLabel}</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {navItems.map((item) => {

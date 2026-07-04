@@ -20,17 +20,19 @@ export const HealthCheckResponse = zod.object({
  * @summary Login
  */
 export const LoginBody = zod.object({
-  "role": zod.enum(['librarian', 'student']),
+  "role": zod.enum(['librarian', 'student', 'teacher']),
   "username": zod.string().optional(),
   "password": zod.string().optional(),
-  "studentId": zod.string().optional()
+  "studentId": zod.string().optional(),
+  "teacherId": zod.string().optional()
 })
 
 export const LoginResponse = zod.object({
   "id": zod.string(),
-  "role": zod.enum(['librarian', 'student']),
+  "role": zod.enum(['librarian', 'student', 'teacher']),
   "name": zod.string(),
-  "studentRecordId": zod.number().nullish()
+  "studentRecordId": zod.number().nullish(),
+  "teacherRecordId": zod.number().nullish()
 })
 
 
@@ -39,9 +41,10 @@ export const LoginResponse = zod.object({
  */
 export const GetMeResponse = zod.object({
   "id": zod.string(),
-  "role": zod.enum(['librarian', 'student']),
+  "role": zod.enum(['librarian', 'student', 'teacher']),
   "name": zod.string(),
-  "studentRecordId": zod.number().nullish()
+  "studentRecordId": zod.number().nullish(),
+  "teacherRecordId": zod.number().nullish()
 })
 
 
@@ -167,6 +170,9 @@ export const ListStudentsResponseItem = zod.object({
   "email": zod.string(),
   "studentId": zod.string(),
   "phone": zod.string().nullish(),
+  "grade": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "rollNumber": zod.string().nullish(),
   "graduationYear": zod.number(),
   "borrowLimit": zod.number(),
   "activeLoansCount": zod.number(),
@@ -184,6 +190,9 @@ export const CreateStudentBody = zod.object({
   "email": zod.string(),
   "studentId": zod.string(),
   "phone": zod.string().optional(),
+  "grade": zod.string().optional(),
+  "section": zod.string().optional(),
+  "rollNumber": zod.string().optional(),
   "graduationYear": zod.number(),
   "borrowLimit": zod.number().optional()
 })
@@ -202,6 +211,9 @@ export const GetStudentResponse = zod.object({
   "email": zod.string(),
   "studentId": zod.string(),
   "phone": zod.string().nullish(),
+  "grade": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "rollNumber": zod.string().nullish(),
   "graduationYear": zod.number(),
   "borrowLimit": zod.number(),
   "activeLoansCount": zod.number(),
@@ -221,6 +233,9 @@ export const UpdateStudentBody = zod.object({
   "name": zod.string().optional(),
   "email": zod.string().optional(),
   "phone": zod.string().optional(),
+  "grade": zod.string().optional(),
+  "section": zod.string().optional(),
+  "rollNumber": zod.string().optional(),
   "graduationYear": zod.number().optional(),
   "borrowLimit": zod.number().optional()
 })
@@ -231,6 +246,9 @@ export const UpdateStudentResponse = zod.object({
   "email": zod.string(),
   "studentId": zod.string(),
   "phone": zod.string().nullish(),
+  "grade": zod.string().nullish(),
+  "section": zod.string().nullish(),
+  "rollNumber": zod.string().nullish(),
   "graduationYear": zod.number(),
   "borrowLimit": zod.number(),
   "activeLoansCount": zod.number(),
@@ -256,12 +274,15 @@ export const GetStudentLoansParams = zod.object({
 
 export const GetStudentLoansResponseItem = zod.object({
   "id": zod.number(),
-  "studentId": zod.number(),
+  "studentId": zod.number().nullish(),
+  "teacherId": zod.number().nullish(),
   "bookId": zod.number(),
   "checkedOutAt": zod.string(),
   "dueDate": zod.string(),
   "returnedAt": zod.string().nullish(),
   "status": zod.enum(['active', 'returned', 'overdue']),
+  "borrowerName": zod.string().nullish(),
+  "borrowerType": zod.enum(['student', 'teacher']).nullish(),
   "studentName": zod.string().nullish(),
   "bookTitle": zod.string().nullish(),
   "bookAuthor": zod.string().nullish()
@@ -274,17 +295,21 @@ export const GetStudentLoansResponse = zod.array(GetStudentLoansResponseItem)
  */
 export const ListLoansQueryParams = zod.object({
   "status": zod.enum(['active', 'returned', 'overdue']).optional(),
-  "studentId": zod.coerce.number().optional()
+  "studentId": zod.coerce.number().optional(),
+  "teacherId": zod.coerce.number().optional()
 })
 
 export const ListLoansResponseItem = zod.object({
   "id": zod.number(),
-  "studentId": zod.number(),
+  "studentId": zod.number().nullish(),
+  "teacherId": zod.number().nullish(),
   "bookId": zod.number(),
   "checkedOutAt": zod.string(),
   "dueDate": zod.string(),
   "returnedAt": zod.string().nullish(),
   "status": zod.enum(['active', 'returned', 'overdue']),
+  "borrowerName": zod.string().nullish(),
+  "borrowerType": zod.enum(['student', 'teacher']).nullish(),
   "studentName": zod.string().nullish(),
   "bookTitle": zod.string().nullish(),
   "bookAuthor": zod.string().nullish()
@@ -293,10 +318,11 @@ export const ListLoansResponse = zod.array(ListLoansResponseItem)
 
 
 /**
- * @summary Check out a book to a student
+ * @summary Check out a book to a student or teacher
  */
 export const CreateLoanBody = zod.object({
-  "studentId": zod.number(),
+  "studentId": zod.number().optional(),
+  "teacherId": zod.number().optional(),
   "bookId": zod.number(),
   "dueDate": zod.string().optional()
 })
@@ -311,12 +337,15 @@ export const GetLoanParams = zod.object({
 
 export const GetLoanResponse = zod.object({
   "id": zod.number(),
-  "studentId": zod.number(),
+  "studentId": zod.number().nullish(),
+  "teacherId": zod.number().nullish(),
   "bookId": zod.number(),
   "checkedOutAt": zod.string(),
   "dueDate": zod.string(),
   "returnedAt": zod.string().nullish(),
   "status": zod.enum(['active', 'returned', 'overdue']),
+  "borrowerName": zod.string().nullish(),
+  "borrowerType": zod.enum(['student', 'teacher']).nullish(),
   "studentName": zod.string().nullish(),
   "bookTitle": zod.string().nullish(),
   "bookAuthor": zod.string().nullish()
@@ -332,12 +361,15 @@ export const ReturnLoanParams = zod.object({
 
 export const ReturnLoanResponse = zod.object({
   "id": zod.number(),
-  "studentId": zod.number(),
+  "studentId": zod.number().nullish(),
+  "teacherId": zod.number().nullish(),
   "bookId": zod.number(),
   "checkedOutAt": zod.string(),
   "dueDate": zod.string(),
   "returnedAt": zod.string().nullish(),
   "status": zod.enum(['active', 'returned', 'overdue']),
+  "borrowerName": zod.string().nullish(),
+  "borrowerType": zod.enum(['student', 'teacher']).nullish(),
   "studentName": zod.string().nullish(),
   "bookTitle": zod.string().nullish(),
   "bookAuthor": zod.string().nullish()
@@ -492,12 +524,15 @@ export const GetDashboardSummaryResponse = zod.object({
  */
 export const GetOverdueLoansResponseItem = zod.object({
   "id": zod.number(),
-  "studentId": zod.number(),
+  "studentId": zod.number().nullish(),
+  "teacherId": zod.number().nullish(),
   "bookId": zod.number(),
   "checkedOutAt": zod.string(),
   "dueDate": zod.string(),
   "returnedAt": zod.string().nullish(),
   "status": zod.enum(['active', 'returned', 'overdue']),
+  "borrowerName": zod.string().nullish(),
+  "borrowerType": zod.enum(['student', 'teacher']).nullish(),
   "studentName": zod.string().nullish(),
   "bookTitle": zod.string().nullish(),
   "bookAuthor": zod.string().nullish()
@@ -510,12 +545,15 @@ export const GetOverdueLoansResponse = zod.array(GetOverdueLoansResponseItem)
  */
 export const GetDueSoonLoansResponseItem = zod.object({
   "id": zod.number(),
-  "studentId": zod.number(),
+  "studentId": zod.number().nullish(),
+  "teacherId": zod.number().nullish(),
   "bookId": zod.number(),
   "checkedOutAt": zod.string(),
   "dueDate": zod.string(),
   "returnedAt": zod.string().nullish(),
   "status": zod.enum(['active', 'returned', 'overdue']),
+  "borrowerName": zod.string().nullish(),
+  "borrowerType": zod.enum(['student', 'teacher']).nullish(),
   "studentName": zod.string().nullish(),
   "bookTitle": zod.string().nullish(),
   "bookAuthor": zod.string().nullish()
@@ -545,3 +583,98 @@ export const GetGenreStatsResponseItem = zod.object({
 export const GetGenreStatsResponse = zod.array(GetGenreStatsResponseItem)
 
 
+/**
+ * @summary List all teachers
+ */
+export const ListTeachersQueryParams = zod.object({
+  "search": zod.coerce.string().optional()
+})
+
+export const ListTeachersResponseItem = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "teacherId": zod.string(),
+  "email": zod.string(),
+  "subject": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "borrowLimit": zod.number(),
+  "activeLoansCount": zod.number(),
+  "createdAt": zod.string()
+})
+export const ListTeachersResponse = zod.array(ListTeachersResponseItem)
+
+
+/**
+ * @summary Add a new teacher
+ */
+export const CreateTeacherBody = zod.object({
+  "name": zod.string(),
+  "teacherId": zod.string(),
+  "email": zod.string(),
+  "subject": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "borrowLimit": zod.number().optional()
+})
+
+
+/**
+ * @summary Get teacher by ID
+ */
+export const GetTeacherParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const GetTeacherResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "teacherId": zod.string(),
+  "email": zod.string(),
+  "subject": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "borrowLimit": zod.number(),
+  "activeLoansCount": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Update a teacher
+ */
+export const UpdateTeacherParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+export const UpdateTeacherBody = zod.object({
+  "name": zod.string().optional(),
+  "email": zod.string().optional(),
+  "subject": zod.string().optional(),
+  "phone": zod.string().optional(),
+  "borrowLimit": zod.number().optional()
+})
+
+export const UpdateTeacherResponse = zod.object({
+  "id": zod.number(),
+  "name": zod.string(),
+  "teacherId": zod.string(),
+  "email": zod.string(),
+  "subject": zod.string().nullish(),
+  "phone": zod.string().nullish(),
+  "borrowLimit": zod.number(),
+  "activeLoansCount": zod.number(),
+  "createdAt": zod.string()
+})
+
+
+/**
+ * @summary Delete a teacher
+ */
+export const DeleteTeacherParams = zod.object({
+  "id": zod.coerce.number()
+})
+
+/**
+ * @summary Get all loans for a teacher
+ */
+export const GetTeacherLoansParams = zod.object({
+  "id": zod.coerce.number()
+})

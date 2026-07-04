@@ -17,6 +17,7 @@ export default function Login() {
   const [librarianUsername, setLibrarianUsername] = useState("librarian");
   const [librarianPassword, setLibrarianPassword] = useState("");
   const [studentId, setStudentId] = useState("");
+  const [teacherId, setTeacherId] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleLibrarianLogin = async (e: React.FormEvent) => {
@@ -49,6 +50,23 @@ export default function Login() {
     }
   };
 
+  const handleTeacherLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!teacherId.trim()) {
+      toast({ title: "Enter your Teacher ID", variant: "destructive" });
+      return;
+    }
+    setLoading(true);
+    try {
+      await login({ role: "teacher", teacherId: teacherId.trim() });
+      navigate("/my-account");
+    } catch (err: any) {
+      toast({ title: "Login failed", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-white to-teal-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
@@ -69,9 +87,10 @@ export default function Login() {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="librarian">
-              <TabsList className="grid w-full grid-cols-2 mb-6">
+              <TabsList className="grid w-full grid-cols-3 mb-6">
                 <TabsTrigger value="librarian">Librarian</TabsTrigger>
                 <TabsTrigger value="student">Student</TabsTrigger>
+                <TabsTrigger value="teacher">Teacher</TabsTrigger>
               </TabsList>
 
               <TabsContent value="librarian">
@@ -121,6 +140,26 @@ export default function Login() {
                   <Button type="submit" className="w-full bg-teal-600 hover:bg-teal-700" disabled={loading}>
                     {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Sign in as Student
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="teacher">
+                <form onSubmit={handleTeacherLogin} className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="teacher-id">Teacher ID</Label>
+                    <Input
+                      id="teacher-id"
+                      value={teacherId}
+                      onChange={(e) => setTeacherId(e.target.value)}
+                      placeholder="e.g. TCH001"
+                      autoComplete="username"
+                    />
+                    <p className="text-xs text-muted-foreground">Use your assigned teacher ID to sign in</p>
+                  </div>
+                  <Button type="submit" className="w-full bg-teal-600 hover:bg-teal-700" disabled={loading}>
+                    {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Sign in as Teacher
                   </Button>
                 </form>
               </TabsContent>

@@ -61,10 +61,10 @@ router.post("/students", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { phone, ...rest } = parsed.data;
+  const { phone, grade, section, rollNumber, ...rest } = parsed.data;
   const [student] = await db
     .insert(studentsTable)
-    .values({ ...rest, phone: phone || null })
+    .values({ ...rest, phone: phone || null, grade: grade || null, section: section || null, rollNumber: rollNumber || null })
     .returning();
   const enriched = await enrichStudent(student);
   res.status(201).json(GetStudentResponse.parse(serializeDates(enriched)));
@@ -96,10 +96,16 @@ router.patch("/students/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { phone, ...rest } = parsed.data;
+  const { phone, grade, section, rollNumber, ...rest } = parsed.data;
   const [student] = await db
     .update(studentsTable)
-    .set({ ...rest, ...(phone !== undefined ? { phone: phone || null } : {}) })
+    .set({
+      ...rest,
+      ...(phone !== undefined ? { phone: phone || null } : {}),
+      ...(grade !== undefined ? { grade: grade || null } : {}),
+      ...(section !== undefined ? { section: section || null } : {}),
+      ...(rollNumber !== undefined ? { rollNumber: rollNumber || null } : {}),
+    })
     .where(eq(studentsTable.id, params.data.id))
     .returning();
   if (!student) {

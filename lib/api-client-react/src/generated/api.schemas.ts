@@ -15,6 +15,7 @@ export type LoginInputRole = typeof LoginInputRole[keyof typeof LoginInputRole];
 export const LoginInputRole = {
   librarian: 'librarian',
   student: 'student',
+  teacher: 'teacher',
 } as const;
 
 export interface LoginInput {
@@ -22,6 +23,7 @@ export interface LoginInput {
   username?: string;
   password?: string;
   studentId?: string;
+  teacherId?: string;
 }
 
 export type AuthUserRole = typeof AuthUserRole[keyof typeof AuthUserRole];
@@ -30,6 +32,7 @@ export type AuthUserRole = typeof AuthUserRole[keyof typeof AuthUserRole];
 export const AuthUserRole = {
   librarian: 'librarian',
   student: 'student',
+  teacher: 'teacher',
 } as const;
 
 export interface AuthUser {
@@ -38,6 +41,8 @@ export interface AuthUser {
   name: string;
   /** @nullable */
   studentRecordId?: number | null;
+  /** @nullable */
+  teacherRecordId?: number | null;
 }
 
 export interface Book {
@@ -90,6 +95,12 @@ export interface Student {
   studentId: string;
   /** @nullable */
   phone?: string | null;
+  /** @nullable */
+  grade?: string | null;
+  /** @nullable */
+  section?: string | null;
+  /** @nullable */
+  rollNumber?: string | null;
   graduationYear: number;
   borrowLimit: number;
   activeLoansCount: number;
@@ -102,6 +113,9 @@ export interface StudentInput {
   email: string;
   studentId: string;
   phone?: string;
+  grade?: string;
+  section?: string;
+  rollNumber?: string;
   graduationYear: number;
   borrowLimit?: number;
 }
@@ -110,7 +124,41 @@ export interface StudentUpdate {
   name?: string;
   email?: string;
   phone?: string;
+  grade?: string;
+  section?: string;
+  rollNumber?: string;
   graduationYear?: number;
+  borrowLimit?: number;
+}
+
+export interface Teacher {
+  id: number;
+  name: string;
+  teacherId: string;
+  email: string;
+  /** @nullable */
+  subject?: string | null;
+  /** @nullable */
+  phone?: string | null;
+  borrowLimit: number;
+  activeLoansCount: number;
+  createdAt: string;
+}
+
+export interface TeacherInput {
+  name: string;
+  teacherId: string;
+  email: string;
+  subject?: string;
+  phone?: string;
+  borrowLimit?: number;
+}
+
+export interface TeacherUpdate {
+  name?: string;
+  email?: string;
+  subject?: string;
+  phone?: string;
   borrowLimit?: number;
 }
 
@@ -123,15 +171,29 @@ export const LoanStatus = {
   overdue: 'overdue',
 } as const;
 
+export type LoanBorrowerType = typeof LoanBorrowerType[keyof typeof LoanBorrowerType];
+
+export const LoanBorrowerType = {
+  student: 'student',
+  teacher: 'teacher',
+} as const;
+
 export interface Loan {
   id: number;
-  studentId: number;
+  /** @nullable */
+  studentId?: number | null;
+  /** @nullable */
+  teacherId?: number | null;
   bookId: number;
   checkedOutAt: string;
   dueDate: string;
   /** @nullable */
   returnedAt?: string | null;
   status: LoanStatus;
+  /** @nullable */
+  borrowerName?: string | null;
+  /** @nullable */
+  borrowerType?: LoanBorrowerType | null;
   /** @nullable */
   studentName?: string | null;
   /** @nullable */
@@ -141,7 +203,8 @@ export interface Loan {
 }
 
 export interface LoanInput {
-  studentId: number;
+  studentId?: number;
+  teacherId?: number;
   bookId: number;
   dueDate?: string;
 }
@@ -236,9 +299,14 @@ search?: string;
 graduationYear?: number;
 };
 
+export type ListTeachersParams = {
+search?: string;
+};
+
 export type ListLoansParams = {
 status?: ListLoansStatus;
 studentId?: number;
+teacherId?: number;
 };
 
 export type ListLoansStatus = typeof ListLoansStatus[keyof typeof ListLoansStatus];
@@ -268,4 +336,3 @@ export type ListFinesParams = {
 studentId?: number;
 paid?: boolean;
 };
-

@@ -3,9 +3,11 @@ import pg from "pg";
 import {
   booksTable,
   studentsTable,
+  teachersTable,
   loansTable,
   finesTable,
   reservationsTable,
+  notificationsTable,
 } from "../../lib/db/src/schema/index.js";
 
 const { Pool } = pg;
@@ -23,8 +25,10 @@ async function seed() {
   // Clear existing data in correct order (FK constraints)
   await db.delete(finesTable);
   await db.delete(reservationsTable);
+  await db.delete(notificationsTable);
   await db.delete(loansTable);
   await db.delete(studentsTable);
+  await db.delete(teachersTable);
   await db.delete(booksTable);
 
   // ── Books ──────────────────────────────────────────────────────────────────
@@ -216,6 +220,47 @@ async function seed() {
 
   console.log(`✅ Inserted ${books.length} books`);
 
+  // ── Teachers ───────────────────────────────────────────────────────────────
+  const teachers = await db
+    .insert(teachersTable)
+    .values([
+      {
+        name: "Mr. Ramesh Kumar",
+        teacherId: "TCH001",
+        email: "ramesh.kumar@school.edu",
+        subject: "Mathematics",
+        phone: "555-0201",
+        borrowLimit: 5,
+      },
+      {
+        name: "Ms. Priya Sharma",
+        teacherId: "TCH002",
+        email: "priya.sharma@school.edu",
+        subject: "English",
+        phone: "555-0202",
+        borrowLimit: 5,
+      },
+      {
+        name: "Dr. Suresh Nair",
+        teacherId: "TCH003",
+        email: "suresh.nair@school.edu",
+        subject: "Science",
+        phone: "555-0203",
+        borrowLimit: 7,
+      },
+      {
+        name: "Mrs. Anita Patel",
+        teacherId: "TCH004",
+        email: "anita.patel@school.edu",
+        subject: "History",
+        phone: "555-0204",
+        borrowLimit: 5,
+      },
+    ])
+    .returning();
+
+  console.log(`✅ Inserted ${teachers.length} teachers`);
+
   // ── Students ──────────────────────────────────────────────────────────────
   const students = await db
     .insert(studentsTable)
@@ -225,6 +270,9 @@ async function seed() {
         email: "alice.johnson@school.edu",
         studentId: "STU001",
         phone: "555-0101",
+        grade: "10",
+        section: "A",
+        rollNumber: "1",
         graduationYear: 2025,
         borrowLimit: 5,
       },
@@ -233,6 +281,9 @@ async function seed() {
         email: "bob.martinez@school.edu",
         studentId: "STU002",
         phone: "555-0102",
+        grade: "10",
+        section: "B",
+        rollNumber: "5",
         graduationYear: 2026,
         borrowLimit: 3,
       },
@@ -241,6 +292,9 @@ async function seed() {
         email: "carol.williams@school.edu",
         studentId: "STU003",
         phone: "555-0103",
+        grade: "11",
+        section: "A",
+        rollNumber: "3",
         graduationYear: 2025,
         borrowLimit: 5,
       },
@@ -249,6 +303,9 @@ async function seed() {
         email: "david.brown@school.edu",
         studentId: "STU004",
         phone: "555-0104",
+        grade: "9",
+        section: "C",
+        rollNumber: "12",
         graduationYear: 2027,
         borrowLimit: 3,
       },
@@ -257,6 +314,9 @@ async function seed() {
         email: "emma.davis@school.edu",
         studentId: "STU005",
         phone: "555-0105",
+        grade: "10",
+        section: "A",
+        rollNumber: "8",
         graduationYear: 2026,
         borrowLimit: 5,
       },
@@ -265,6 +325,9 @@ async function seed() {
         email: "frank.garcia@school.edu",
         studentId: "STU006",
         phone: "555-0106",
+        grade: "11",
+        section: "B",
+        rollNumber: "15",
         graduationYear: 2025,
         borrowLimit: 3,
       },
@@ -273,6 +336,9 @@ async function seed() {
         email: "grace.lee@school.edu",
         studentId: "STU007",
         phone: "555-0107",
+        grade: "9",
+        section: "A",
+        rollNumber: "2",
         graduationYear: 2027,
         borrowLimit: 5,
       },
@@ -281,6 +347,9 @@ async function seed() {
         email: "henry.wilson@school.edu",
         studentId: "STU008",
         phone: "555-0108",
+        grade: "12",
+        section: "B",
+        rollNumber: "20",
         graduationYear: 2026,
         borrowLimit: 3,
       },
@@ -289,6 +358,9 @@ async function seed() {
         email: "isabella.moore@school.edu",
         studentId: "STU009",
         phone: "555-0109",
+        grade: "11",
+        section: "C",
+        rollNumber: "7",
         graduationYear: 2025,
         borrowLimit: 5,
       },
@@ -297,6 +369,9 @@ async function seed() {
         email: "james.taylor@school.edu",
         studentId: "STU010",
         phone: "555-0110",
+        grade: "9",
+        section: "B",
+        rollNumber: "10",
         graduationYear: 2027,
         borrowLimit: 3,
       },
@@ -313,7 +388,7 @@ async function seed() {
   const loans = await db
     .insert(loansTable)
     .values([
-      // Active loans
+      // Active student loans
       {
         studentId: students[0].id,
         bookId: books[0].id,
@@ -349,7 +424,7 @@ async function seed() {
         dueDate: daysFromNow(12),
         status: "active",
       },
-      // Overdue loans
+      // Overdue student loans
       {
         studentId: students[1].id,
         bookId: books[1].id,
@@ -371,7 +446,7 @@ async function seed() {
         dueDate: daysAgo(16),
         status: "overdue",
       },
-      // Returned loans
+      // Returned student loans
       {
         studentId: students[6].id,
         bookId: books[3].id,
@@ -411,6 +486,28 @@ async function seed() {
         dueDate: daysAgo(36),
         returnedAt: daysAgo(37),
         status: "returned",
+      },
+      // Teacher loans
+      {
+        teacherId: teachers[0].id,
+        bookId: books[12].id,
+        checkedOutAt: daysAgo(4),
+        dueDate: daysFromNow(10),
+        status: "active",
+      },
+      {
+        teacherId: teachers[1].id,
+        bookId: books[14].id,
+        checkedOutAt: daysAgo(8),
+        dueDate: daysFromNow(6),
+        status: "active",
+      },
+      {
+        teacherId: teachers[2].id,
+        bookId: books[9].id,
+        checkedOutAt: daysAgo(22),
+        dueDate: daysAgo(8),
+        status: "overdue",
       },
     ])
     .returning();

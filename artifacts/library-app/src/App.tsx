@@ -12,12 +12,14 @@ import Books from "@/pages/books";
 import BookDetail from "@/pages/book-detail";
 import Students from "@/pages/students";
 import StudentDetail from "@/pages/student-detail";
+import Teachers from "@/pages/teachers";
 import Loans from "@/pages/loans";
 import Lending from "@/pages/lending";
 import Reservations from "@/pages/reservations";
 import Fines from "@/pages/fines";
 import Catalog from "@/pages/catalog";
 import MyAccount from "@/pages/my-account";
+import TeacherAccount from "@/pages/teacher-account";
 import Notifications from "@/pages/notifications";
 import { Loader2 } from "lucide-react";
 
@@ -49,11 +51,13 @@ function Router() {
   }
 
   const isLibrarian = user.role === "librarian";
+  const isTeacher = user.role === "teacher";
+  const defaultPath = isLibrarian ? "/" : "/my-account";
 
   return (
     <Switch>
       <Route path="/login">
-        <Redirect to={isLibrarian ? "/" : "/my-account"} />
+        <Redirect to={defaultPath} />
       </Route>
       <Route>
         <SidebarLayout>
@@ -63,13 +67,17 @@ function Router() {
             {isLibrarian && <Route path="/books/:id" component={BookDetail} />}
             {isLibrarian && <Route path="/students" component={Students} />}
             {isLibrarian && <Route path="/students/:id" component={StudentDetail} />}
+            {isLibrarian && <Route path="/teachers" component={Teachers} />}
             {isLibrarian && <Route path="/loans" component={Loans} />}
             {isLibrarian && <Route path="/lending" component={Lending} />}
             {isLibrarian && <Route path="/fines" component={Fines} />}
             <Route path="/reservations" component={Reservations} />
             <Route path="/catalog" component={Catalog} />
-            <Route path="/my-account" component={MyAccount} />
-            <Route path="/notifications" component={Notifications} />
+            {isTeacher
+              ? <Route path="/my-account" component={TeacherAccount} />
+              : <Route path="/my-account" component={MyAccount} />
+            }
+            {!isTeacher && <Route path="/notifications" component={Notifications} />}
             <Route>
               {isLibrarian ? <NotFound /> : <Redirect to="/my-account" />}
             </Route>
