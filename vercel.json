@@ -1,6 +1,6 @@
 {
   "buildCommand": "pnpm --filter @workspace/library-app run build",
-  "outputDirectory": "artifacts/library-app/dist/public",
+  "outputDirectory": "dist/public",
   "env": {
     "PORT": "3000",
     "BASE_PATH": "/"
@@ -10,4 +10,3 @@
     { "source": "/(.*)", "destination": "/index.html" }
   ]
 }
-
