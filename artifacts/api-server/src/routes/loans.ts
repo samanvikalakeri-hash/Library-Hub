@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, and, sql } from "drizzle-orm";
-import { db, loansTable, booksTable, studentsTable, teachersTable, finesTable } from "@workspace/db";
+import { db, loansTable, booksTable, studentsTable, teachersTable, finesTable, notificationsTable } from "@workspace/db";
 import {
   ListLoansQueryParams,
   ListLoansResponse,
@@ -239,16 +239,34 @@ router.post("/loans/:id/return", async (req, res): Promise<void> => {
     .set({ availableCopies: sql`${booksTable.availableCopies} + 1` })
     .where(eq(booksTable.id, existing.bookId));
 
-  if (existing.studentId && now > existing.dueDate) {
+  if (now > existing.dueDate) {
     const daysLate = Math.ceil((now.getTime() - existing.dueDate.getTime()) / 86400000);
     const amount = (daysLate * FINE_PER_DAY).toFixed(2);
-    await db.insert(finesTable).values({
-      studentId: existing.studentId,
-      loanId: existing.id,
-      amount,
-      reason: `Late return — ${daysLate} day(s) overdue`,
-      paid: false,
-    });
+    if (existing.studentId) {
+      await db.insert(finesTable).values({
+        studentId: existing.studentId,
+        teacherId: null,
+        loanId: existing.id,
+        amount,
+        reason: `Late return — ${daysLate} day(s) overdue`,
+        paid: false,
+      });
+    } else if (existing.teacherId) {
+      await db.insert(finesTable).values({
+        studentId: null,
+        teacherId: existing.teacherId,
+        loanId: existing.id,
+        amount,
+        reason: `Late return — ${daysLate} day(s) overdue`,
+        paid: false,
+      });
+      await db.insert(notificationsTable).values({
+        teacherId: existing.teacherId,
+        studentId: null,
+        message: `A fine of ₹${amount} has been issued for the late return of a book (${daysLate} day(s) overdue).`,
+        type: "warning",
+      });
+    }
   }
 
   const [student] = existing.studentId

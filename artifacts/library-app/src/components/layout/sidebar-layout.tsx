@@ -39,6 +39,7 @@ const studentNavItems = [
 const teacherNavItems = [
   { href: "/catalog", label: "Book Catalog", icon: Library },
   { href: "/my-account", label: "My Account", icon: User },
+  { href: "/notifications", label: "Notifications", icon: Bell },
 ];
 
 function NotificationBadge() {
@@ -93,7 +94,7 @@ export function SidebarLayout({ children }: { children: React.ReactNode }) {
                           <Link href={item.href} className="flex items-center w-full">
                             <Icon className="h-4 w-4" />
                             <span className="flex-1">{item.label}</span>
-                            {item.href === "/notifications" && isStudent && <NotificationBadge />}
+                            {item.href === "/notifications" && (isStudent || user?.role === "teacher") && <NotificationBadge />}
                           </Link>
                         </SidebarMenuButton>
                       </SidebarMenuItem>

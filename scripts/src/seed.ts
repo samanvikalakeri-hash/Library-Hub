@@ -557,6 +557,27 @@ async function seed() {
         paid: true,
         paidAt: daysAgo(12),
       },
+      // Teacher fines
+      {
+        teacherId: teachers[2].id,
+        loanId: loans[14].id,
+        amount: "3.75",
+        reason: "Overdue return — 15 days late",
+        paid: false,
+      },
+      {
+        teacherId: teachers[0].id,
+        amount: "25.00",
+        reason: "Lost book — replacement cost",
+        paid: false,
+      },
+      {
+        teacherId: teachers[1].id,
+        amount: "10.00",
+        reason: "Damage fee — torn pages",
+        paid: true,
+        paidAt: daysAgo(5),
+      },
     ])
     .returning();
 

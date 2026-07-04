@@ -442,19 +442,24 @@ export const DeleteReservationParams = zod.object({
  */
 export const ListFinesQueryParams = zod.object({
   "studentId": zod.coerce.number().optional(),
+  "teacherId": zod.coerce.number().optional(),
   "paid": zod.coerce.boolean().optional()
 })
 
 export const ListFinesResponseItem = zod.object({
   "id": zod.number(),
-  "studentId": zod.number(),
+  "studentId": zod.number().nullish(),
+  "teacherId": zod.number().nullish(),
   "loanId": zod.number().nullish(),
   "amount": zod.number(),
   "reason": zod.string(),
   "paid": zod.boolean(),
   "paidAt": zod.string().nullish(),
   "createdAt": zod.string(),
+  "borrowerName": zod.string().nullish(),
+  "borrowerType": zod.enum(['student', 'teacher']).nullish(),
   "studentName": zod.string().nullish(),
+  "teacherName": zod.string().nullish(),
   "bookTitle": zod.string().nullish()
 })
 export const ListFinesResponse = zod.array(ListFinesResponseItem)
@@ -464,7 +469,8 @@ export const ListFinesResponse = zod.array(ListFinesResponseItem)
  * @summary Create a new fine (on-spot collection)
  */
 export const CreateFineBody = zod.object({
-  "studentId": zod.number(),
+  "studentId": zod.number().optional(),
+  "teacherId": zod.number().optional(),
   "amount": zod.number().positive(),
   "reason": zod.string().min(1),
   "collectNow": zod.boolean().optional()
@@ -472,14 +478,18 @@ export const CreateFineBody = zod.object({
 
 export const CreateFineResponse = zod.object({
   "id": zod.number(),
-  "studentId": zod.number(),
+  "studentId": zod.number().nullish(),
+  "teacherId": zod.number().nullish(),
   "loanId": zod.number().nullish(),
   "amount": zod.number(),
   "reason": zod.string(),
   "paid": zod.boolean(),
   "paidAt": zod.string().nullish(),
   "createdAt": zod.string(),
+  "borrowerName": zod.string().nullish(),
+  "borrowerType": zod.enum(['student', 'teacher']).nullish(),
   "studentName": zod.string().nullish(),
+  "teacherName": zod.string().nullish(),
   "bookTitle": zod.string().nullish()
 })
 
@@ -493,14 +503,18 @@ export const ClearFineParams = zod.object({
 
 export const ClearFineResponse = zod.object({
   "id": zod.number(),
-  "studentId": zod.number(),
+  "studentId": zod.number().nullish(),
+  "teacherId": zod.number().nullish(),
   "loanId": zod.number().nullish(),
   "amount": zod.number(),
   "reason": zod.string(),
   "paid": zod.boolean(),
   "paidAt": zod.string().nullish(),
   "createdAt": zod.string(),
+  "borrowerName": zod.string().nullish(),
+  "borrowerType": zod.enum(['student', 'teacher']).nullish(),
   "studentName": zod.string().nullish(),
+  "teacherName": zod.string().nullish(),
   "bookTitle": zod.string().nullish()
 })
 

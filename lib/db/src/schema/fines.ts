@@ -2,11 +2,13 @@ import { pgTable, serial, integer, timestamp, text, numeric, boolean } from "dri
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 import { studentsTable } from "./students";
+import { teachersTable } from "./teachers";
 import { loansTable } from "./loans";
 
 export const finesTable = pgTable("fines", {
   id: serial("id").primaryKey(),
-  studentId: integer("student_id").notNull().references(() => studentsTable.id),
+  studentId: integer("student_id").references(() => studentsTable.id),
+  teacherId: integer("teacher_id").references(() => teachersTable.id),
   loanId: integer("loan_id").references(() => loansTable.id),
   amount: numeric("amount", { precision: 8, scale: 2 }).notNull(),
   reason: text("reason").notNull(),

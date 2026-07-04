@@ -250,10 +250,21 @@ export interface ReservationUpdate {
   status?: ReservationUpdateStatus;
 }
 
+export type FineBorrowerType = typeof FineBorrowerType[keyof typeof FineBorrowerType];
+
+export const FineBorrowerType = {
+  student: 'student',
+  teacher: 'teacher',
+} as const;
+
 export interface Fine {
   id: number;
-  studentId: number;
-  loanId: number;
+  /** @nullable */
+  studentId?: number | null;
+  /** @nullable */
+  teacherId?: number | null;
+  /** @nullable */
+  loanId?: number | null;
   amount: number;
   reason: string;
   paid: boolean;
@@ -261,7 +272,13 @@ export interface Fine {
   paidAt?: string | null;
   createdAt: string;
   /** @nullable */
+  borrowerName?: string | null;
+  /** @nullable */
+  borrowerType?: FineBorrowerType | null;
+  /** @nullable */
   studentName?: string | null;
+  /** @nullable */
+  teacherName?: string | null;
   /** @nullable */
   bookTitle?: string | null;
 }
@@ -334,5 +351,6 @@ export const ListReservationsStatus = {
 
 export type ListFinesParams = {
 studentId?: number;
+teacherId?: number;
 paid?: boolean;
 };

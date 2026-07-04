@@ -77,7 +77,7 @@ function Router() {
               ? <Route path="/my-account" component={TeacherAccount} />
               : <Route path="/my-account" component={MyAccount} />
             }
-            {!isTeacher && <Route path="/notifications" component={Notifications} />}
+            <Route path="/notifications" component={Notifications} />
             <Route>
               {isLibrarian ? <NotFound /> : <Redirect to="/my-account" />}
             </Route>
