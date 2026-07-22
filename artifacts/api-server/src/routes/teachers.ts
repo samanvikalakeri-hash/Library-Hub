@@ -1,6 +1,6 @@
 import { Router, type IRouter } from "express";
 import { eq, ilike, and, sql } from "drizzle-orm";
-import { db, teachersTable, loansTable, booksTable, studentsTable } from "@workspace/db";
+import { db, teachersTable, loansTable, booksTable, studentsTable, finesTable, notificationsTable } from "@workspace/db";
 import {
   ListTeachersQueryParams,
   ListTeachersResponse,
@@ -114,11 +114,30 @@ router.delete("/teachers/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [teacher] = await db.delete(teachersTable).where(eq(teachersTable.id, params.data.id)).returning();
+  const teacherId = params.data.id;
+
+  // Verify teacher exists
+  const [teacher] = await db.select().from(teachersTable).where(eq(teachersTable.id, teacherId));
   if (!teacher) {
     res.status(404).json({ error: "Teacher not found" });
     return;
   }
+
+  // Block if teacher has active (non-returned) loans
+  const [activeLoansRow] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(loansTable)
+    .where(and(eq(loansTable.teacherId, teacherId), sql`${loansTable.status} != 'returned'`));
+  if ((activeLoansRow?.count ?? 0) > 0) {
+    res.status(409).json({ error: `Cannot delete: this teacher has ${activeLoansRow.count} active loan(s). Collect the book(s) first.` });
+    return;
+  }
+
+  // Cascade delete in FK order
+  await db.delete(finesTable).where(eq(finesTable.teacherId, teacherId));
+  await db.delete(loansTable).where(eq(loansTable.teacherId, teacherId));
+  await db.delete(notificationsTable).where(eq(notificationsTable.teacherId, teacherId));
+  await db.delete(teachersTable).where(eq(teachersTable.id, teacherId));
   res.sendStatus(204);
 });
 
